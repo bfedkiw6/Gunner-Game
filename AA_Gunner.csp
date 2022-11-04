@@ -1,0 +1,39 @@
+	.EQU 	KBD_CNTL, $000
+	.EQU 	KBD_STAT, $000
+	.EQU 	KBD_DATA, $001
+	.EQU 	KBD_FLUSH, $40
+	.EQU 	TIM_CNTL, $030
+	.EQU 	TIM_STAT, $030
+	.EQU 	TIM_VALUE, $031
+	.EQU 	TIM_COUNT, $034
+
+	.EQU SCORE, $100	; $100-$10A supporting 11 digits?
+	.EQU LEVEL, $124	; $124-$125 supporting up to thousands
+	.EQU CRT_END, $313
+	.EQU CRT_CNTL, $316
+	.EQU CRT_ROWS, $0E	; Number of rows in CRT
+	.EQU CRT_COLS, $26	; Number of columns per row
+          	.EQU CLEAR_DISPLAY, $01
+	.EQU BELL, $06
+
+	.EQU 	INTERRUPT_ENA, $80
+	.EQU 	RESET_READY_BIT, $40
+	.EQU 	START_AFTER_LOAD, $10
+	.EQU 	ENABLE_RESET_AND_START, $D0
+	.EQU 	ENABLE_AND_RESET, $C0
+
+	; Game Related .EQUs
+	.EQU	GROUND, $5F	; ASCII for "_"
+
+MAIN:	LDS# $E00
+	HLT
+
+
+
+
+
+; /\
+;|--|
+
+; ^
+;|-|
