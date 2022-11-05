@@ -28,6 +28,12 @@
 MAIN:	LDS# $E00
 	HLT
 
+; void display()
+
+; void startGame()
+
+; void play()
+
 
 
 
