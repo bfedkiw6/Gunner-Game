@@ -9,6 +9,7 @@
 
 	.EQU SCORE, $100	; $100-$10A supporting 11 digits?
 	.EQU LEVEL, $124	; $124-$125 supporting up to thousands
+              .EQU CRT_VBUF, $100
 	.EQU CRT_END, $313
 	.EQU CRT_CNTL, $316
 	.EQU CRT_ROWS, $0E	; Number of rows in CRT
@@ -26,14 +27,35 @@
 	.EQU	GROUND, $5F	; ASCII for "_"
 
 MAIN:	LDS# $E00
+              JSR  START_GAME  
 	HLT
 
 ; void display()
 
 ; void startGame()
+START_GAME:    BGN#  0
+               PSHA
+               PSHX
+               CLR   COUNT
+               LDA#  GROUND
+               LDX#  CRT_END-CRT_COLS
+               
+PRINT_GROUND:  OUTB+ CRT_VBUF
+               ADX#  1
+               INC   COUNT
+               CMA#  CRT_COLS
+               JNE   PRINT_GROUND
+               POPA
+               POPX
+               FIN#  0
+               RTN          
+
+; void moveTurret(char key, int x)
 
 ; void play()
 
+
+COUNT:  .BLKW 0
 
 
 
