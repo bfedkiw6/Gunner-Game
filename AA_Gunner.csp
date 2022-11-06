@@ -7,15 +7,14 @@
 	.EQU 	TIM_VALUE, $031
 	.EQU 	TIM_COUNT, $034
 
-	.EQU SCORE, $100	; $100-$10A supporting 11 digits?
-	.EQU LEVEL, $124	; $124-$125 supporting up to thousands
-              .EQU CRT_VBUF, $100
-	.EQU CRT_END, $313
-	.EQU CRT_CNTL, $316
-	.EQU CRT_ROWS, $0E	; Number of rows in CRT
-	.EQU CRT_COLS, $26	; Number of columns per row
-          	.EQU CLEAR_DISPLAY, $01
-	.EQU BELL, $06
+	.EQU 	SCORE, $100	; $100-$10A supporting 11 digits?
+	.EQU 	LEVEL, $124	; $124-$125 supporting up to thousands
+	.EQU 	CRT_END, $313
+	.EQU 	CRT_CNTL, $316
+	.EQU 	CRT_ROWS, $0E	; Number of rows in CRT
+	.EQU 	CRT_COLS, $26	; Number of columns per row
+          	.EQU 	CLEAR_DISPLAY, $01
+	.EQU 	BELL, $06
 
 	.EQU 	INTERRUPT_ENA, $80
 	.EQU 	RESET_READY_BIT, $40
@@ -26,13 +25,22 @@
 	; Game Related .EQUs
 	.EQU	GROUND, $5F	; ASCII for "_"
 
-MAIN:	LDS# $E00
-              JSR  START_GAME  
+SETUP:	LDS# $E00
+	; Load initial stage
+	; Probably just the ground, ship, score, level
+	; Let the user have maybe 5 seconds before ships start spawning in
+MAIN:	JSR START_GAME
 	HLT
 
+
+	.EQU	@, $200
 ; void display()
 
 ; void startGame()
+	; Loads graphics
+	; Need to go through first row and load score and level
+	; Score: ######	Lvl: ####
+	; Ground can be ------ or _____ see what looks better
 START_GAME:    BGN#  0
                PSHA
                PSHX
@@ -54,9 +62,13 @@ PRINT_GROUND:  OUTB+ CRT_VBUF
 
 ; void play()
 
+; Need a subroutine for moving the ship
+; Maybe have a blkw holding the ports that the ship occupies for easy finding and moving?
 
 COUNT:  .BLKW 0
-
+; Keyboard ISR for moving the ship left or right
+; Might need to let the ship move offscreen if 
+; we are planning to make 1 port enemy ship sizes
 
 
 
