@@ -27,14 +27,24 @@
 	; Game Related .EQUs
 	.EQU	GROUND, $2D	; ASCII for "-"
 
-SETUP:	LDS# $E00
+SETUP:	LDS# 	$E00
+	; Keyboard setup
+	LDA#	INTERRUPT_ENA
+	OUTB	KBD_CNTL
+	; Timer setup
+	SIE
 	; Load initial stage
 	; Probably just the ground, ship, score, level
 	; Let the user have maybe 5 seconds before ships start spawning in
 MAIN:	JSR START_GAME
+LOOP:	NOP
+	JMP	LOOP
 	HLT
 
+; Stores the ports for ^ and the left | of the ship/AA gun
+SHIP:	.BLKW 2
 
+	; Subroutines
 	.EQU	@, $200
 ; void display()
 
@@ -43,24 +53,27 @@ MAIN:	JSR START_GAME
 	; Need to go through first row and load score and level
 	; Score: ######	Lvl: ####
 	; Ground can be ------ or _____ see what looks better
+
 START_GAME:	BGN#  0
 	PSHA
 	PSHX 
-; Print Score
+	; Print Score
 	LDX#	0
 PRINT_SCORE:	LDC	SCORE_STR
 	OUTB+	CRT_VBUF
 	AOC#	6	; Check if all characters are printed
 	JNE	PRINT_SCORE
-; Print level
+	; Print level
 	LDX#  0	
 PRINT_LEVEL:	LDC	LEVEL_STR
-	ADX#	30	; To not overwrite Score, shift over XR (leave room for the level #)
+	; To not overwrite Score, shift over XR (leave room for the level #)
+	ADX#	30
 	OUTB+	CRT_VBUF
-	SBX#	30	; Return back to original XR so next character can be gotten
+	; Return back to original XR so next character can be gotten
+	SBX#	30
 	AOC#	6	; Check if all characters are printed
 	JNE	PRINT_LEVEL
-; Build the Turret
+	; Build the Turret
 	LDA#  '^'	; Print turret at middle of screen
 	LDX#	(11*CRT_COLS) + (CRT_COLS/2)
 	OUTB+ CRT_VBUF
@@ -72,7 +85,7 @@ PRINT_LEVEL:	LDC	LEVEL_STR
 	OUTB+	CRT_VBUF
 	ADX#	2		
 	OUTB+	CRT_VBUF		
-; Print the ground
+	; Print the ground
 	LDA#  GROUND	; Load up ground character
 	LDX#  13*CRT_COLS	; Set ground to start on last row
 PRINT_GROUND:	OUTB+ CRT_VBUF	; Output across whole row
@@ -87,21 +100,73 @@ SCORE_STR:	.WORD	'Sco'
 SCORE_STR2:	.WORD	're:'
 LEVEL_STR:	.WORD	'Lev'
 LEVEL_STR2:	.WORD	'el:'
-	
 
+	; Work in progress
+	; Need to figure out how to initialize and move projectiles
+SHOOT:	BGN# 	0
+	PSHA
+	LDA#	'S'
+	OUTB 	$214
+	POPA
+	FIN# 	0
+	RTN
+
+	; Work in progress
+	; Moves the ship left(1) or right(2)
+	.EQU	LorR, 2
+MOVE:	BGN# 	0
+	PSHA
+	PSHX
+	LDA	!LorR
+	ADA#	$30
+	OUTB	$214
+	POPX
+	POPA
+	FIN#	0
+	RTN
 ; void moveTurret(char key, int x)
 
 ; void play()
 
+; For timer and moving everything, we have to plan how things move
+; and how to decide what direction something moves in
+
 ; Need a subroutine for moving the ship
 ; Maybe have a blkw holding the ports that the ship occupies for easy finding and moving?
 
+	; ISRs
+	.EQU	@, $300
+	; Keyboard ISR for player controls
+	.EQU	LEFT, 1
+	.EQU 	RIGHT, 2
+KBD_ISR:	PSHA
+	LDA#	0	; Finish this interrupt before allowing more
+	OUTB	KBD_CNTL
+	INB	KBD_DATA
+	CMA#	$1B
+	JEQ 	MOVEMENT
+	CMA# 	$20
+	JNE 	KBD_DONE
+	JSR	SHOOT
+MOVEMENT:	INB 	KBD_DATA
+	CMA#	$4B
+	JNE 	CHECK_RIGHT
+	PSH# 	LEFT
+	JSR 	MOVE
+	ADS# 	1
+	JMP  	KBD_DONE
+CHECK_RIGHT:	CMA# 	$4D
+	JNE 	KBD_DONE
+	PSH# 	RIGHT
+	JSR 	MOVE
+	ADS# 	1
+KBD_DONE:	LDA#	INTERRUPT_ENA	; Re-enable KBD interrupts
+	OUTB	KBD_CNTL
+	POPA
+	IRTN
 
-; Keyboard ISR for moving the ship left or right
-; Might need to let the ship move offscreen if 
-; we are planning to make 1 port enemy ship sizes
-
-
+	.EQU @, $FF8
+	.WORD KBD_ISR
 
 ; /\
 ;|--|
