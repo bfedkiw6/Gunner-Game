@@ -9,6 +9,7 @@
 
 	.EQU 	SCORE, $100	; $100-$10A supporting 11 digits?
 	.EQU 	LEVEL, $124	; $124-$125 supporting up to thousands
+	.EQU  CRT_VBUF, $100
 	.EQU 	CRT_END, $313
 	.EQU 	CRT_CNTL, $316
 	.EQU 	CRT_ROWS, $0E	; Number of rows in CRT
@@ -22,8 +23,9 @@
 	.EQU 	ENABLE_RESET_AND_START, $D0
 	.EQU 	ENABLE_AND_RESET, $C0
 
+
 	; Game Related .EQUs
-	.EQU	GROUND, $5F	; ASCII for "_"
+	.EQU	GROUND, $2D	; ASCII for "-"
 
 SETUP:	LDS# $E00
 	; Load initial stage
@@ -41,22 +43,51 @@ MAIN:	JSR START_GAME
 	; Need to go through first row and load score and level
 	; Score: ######	Lvl: ####
 	; Ground can be ------ or _____ see what looks better
-START_GAME:    BGN#  0
-               PSHA
-               PSHX
-               CLR   COUNT
-               LDA#  GROUND
-               LDX#  CRT_END-CRT_COLS
-               
-PRINT_GROUND:  OUTB+ CRT_VBUF
-               ADX#  1
-               INC   COUNT
-               CMA#  CRT_COLS
-               JNE   PRINT_GROUND
-               POPA
-               POPX
-               FIN#  0
-               RTN          
+START_GAME:	BGN#  0
+	PSHA
+	PSHX 
+; Print Score
+	LDX#	0
+PRINT_SCORE:	LDC	SCORE_STR
+	OUTB+	CRT_VBUF
+	AOC#	6	; Check if all characters are printed
+	JNE	PRINT_SCORE
+; Print level
+	LDX#  0	
+PRINT_LEVEL:	LDC	LEVEL_STR
+	ADX#	30	; To not overwrite Score, shift over XR (leave room for the level #)
+	OUTB+	CRT_VBUF
+	SBX#	30	; Return back to original XR so next character can be gotten
+	AOC#	6	; Check if all characters are printed
+	JNE	PRINT_LEVEL
+; Build the Turret
+	LDA#  '^'	; Print turret at middle of screen
+	LDX#	(11*CRT_COLS) + (CRT_COLS/2)
+	OUTB+ CRT_VBUF
+	LDA#	'-'
+	ADX#	CRT_COLS	; Shift to next line, still at middle
+	OUTB+	CRT_VBUF
+	LDA#	'|'
+	SBX#	1	
+	OUTB+	CRT_VBUF
+	ADX#	2		
+	OUTB+	CRT_VBUF		
+; Print the ground
+	LDA#  GROUND	; Load up ground character
+	LDX#  13*CRT_COLS	; Set ground to start on last row
+PRINT_GROUND:	OUTB+ CRT_VBUF	; Output across whole row
+	ADX#  1             
+	CMX#  CRT_END
+	JNE   PRINT_GROUND
+	POPA
+	POPX
+	FIN#  0
+	RTN          
+SCORE_STR:	.WORD	'Sco'
+SCORE_STR2:	.WORD	're:'
+LEVEL_STR:	.WORD	'Lev'
+LEVEL_STR2:	.WORD	'el:'
+	
 
 ; void moveTurret(char key, int x)
 
@@ -65,7 +96,7 @@ PRINT_GROUND:  OUTB+ CRT_VBUF
 ; Need a subroutine for moving the ship
 ; Maybe have a blkw holding the ports that the ship occupies for easy finding and moving?
 
-COUNT:  .BLKW 0
+
 ; Keyboard ISR for moving the ship left or right
 ; Might need to let the ship move offscreen if 
 ; we are planning to make 1 port enemy ship sizes
