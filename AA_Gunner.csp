@@ -48,9 +48,8 @@ SHIP_R2:	.WORD $100 + (12*CRT_COLS) + (CRT_COLS/2) - 2
 
 	; Subroutines
 	.EQU	@, $200
-; void display()
 
-; void startGame()
+	; void startGame()
 	; Loads graphics
 	; Need to go through first row and load score and level
 	; Score: ######	Lvl: ##
@@ -84,15 +83,7 @@ PRINT_PT2:	LDA# '0'
 	LDA# '1'
 	OUTB	LEVEL + 1
 	; Build the Turret
-	LDA#  '^'	; Print turret at middle of screen
-	OUTB*	SHIP_R1
-	LDX# 	1
-	LDA#	'-'
-	OUTB& SHIP_R2
-	LDA#	'|'	
-	OUTB*	SHIP_R2
-	ADX#	1		
-	OUTB&	SHIP_R2		
+	JSR 	DISPLAY_SHIP		
 	; Print the ground
 	LDA#  GROUND_CHAR	; Load up ground character
 	LDX#  GROUND	; Set ground to start on last row
@@ -116,71 +107,75 @@ SHOOT:	BGN# 	0
 	FIN# 	0
 	RTN
 
+	; Displays ship at ports
+	; Uses global ship variables
+DISPLAY_SHIP:	BGN#	0
+	PSHA
+	PSHX
+	LDA#  '^'
+	OUTB*	SHIP_R1
+	LDX# 	1
+	LDA#	'-'
+	OUTB& SHIP_R2
+	LDA#	'|'	
+	OUTB*	SHIP_R2
+	ADX#	1		
+	OUTB&	SHIP_R2
+	POPX
+	POPA
+	FIN# 	0
+	RTN
+
+	; Clears ship
+	.EQU	C_ROW1, 3
+	.EQU 	C_ROW2, 2
+CLEAR_SHIP:	BGN#	0
+	PSHA
+	PSHX
+	LDX#	0
+	LDA# 	' '	; Clear previous ship positions
+	OUTB*	!C_ROW1
+CLEAR_R2:	OUTB&	!C_ROW2
+	AOC#	3
+	JLT	CLEAR_R2
+	POPX
+	POPA
+	FIN#	0
+	RTN
+
 	; Moves the ship left(1) or right(2)
 	.EQU	LorR, 4
-	.EQU	ROW1, 3
-	.EQU	ROW2, 2
+	.EQU	M_ROW1, 3
+	.EQU	M_ROW2, 2
 	.EQU	LEFTMOST_POS, $2C8
 	.EQU	RIGHTMOST_POS, $2ED
 MOVE_SHIP:	BGN# 	0
 	PSHA
 	PSHX
+	PSH*	!M_ROW1	; Preemptively push current addresses for clear
+	PSH*	!M_ROW2
 	LDA	!LorR
 	CMA#	1
 	JNE	M_RIGHT
-	LDX#	0
-	LDA*	!ROW2
+	LDA*	!M_ROW2
 	CMA#	LEFTMOST_POS	; Check if already at leftmost position
 	JEQ	MOVE_DONE
-	SBA# 	1
-	STA	NEW_ROW2	; Store new leftmost position
-SHIFT_LEFT:	INB&	SHIP_R2	; Move ship at row 2 one to the left
-	OUTB&	NEW_ROW2
-	AOC#	3
-	JLT	SHIFT_LEFT
-	LDA*	!ROW1	; Move ship at row 1 one to the left
-	SBA#	1
-	STA	NEW_ROW1
-	INB*	SHIP_R1
-	OUTB*	NEW_ROW1
-	LDA#	' '	; Clear old positions
-	OUTB* SHIP_R1
-	OUTB&	NEW_ROW2
-	DEC*	!ROW1	; Set new ship ports
-	DEC*	!ROW2
-	JMP	MOVE_DONE
-M_RIGHT:	LDX#	2
-	LDA*	!ROW2
+	DEC*	!M_ROW1	; Set new ship ports
+	DEC*	!M_ROW2
+	JMP	M_MOVE
+M_RIGHT:	LDA*	!M_ROW2
 	ADA#	2
 	CMA#	RIGHTMOST_POS	; Check if already at rightmost position
 	JEQ	MOVE_DONE
-	ADA# 	1
-	STA	NEW_ROW2	; Store new rightmost position
-SHIFT_RIGHT:	INB&	SHIP_R2	; Move ship at row 2 one to the right
-	ADX#	1
-	OUTB&	SHIP_R2
-	SBX#	1
-	SOJ	SHIFT_RIGHT
-	LDA*	!ROW1	; Move ship at row 1 one to the right
-	ADA#	1
-	STA	NEW_ROW1
-	INB*	SHIP_R1
-	OUTB*	NEW_ROW1
-	LDA#	' '
-	OUTB* SHIP_R1
-	OUTB*	SHIP_R2
-	INC*	!ROW1	; Set new ship ports
-	INC*	!ROW2
-MOVE_DONE:	LDA#	0	; Reset variables
-	STA	NEW_ROW1
-	STA	NEW_ROW2
+	INC*	!M_ROW1	; Set new ship ports
+	INC*	!M_ROW2
+M_MOVE:	JSR	CLEAR_SHIP	; Clear ship
+	JSR 	DISPLAY_SHIP	; Display ship at new ports
+MOVE_DONE:	ADS#	2	; Remove parameters for clear from stack
 	POPX
 	POPA
 	FIN#	0
 	RTN
-NEW_ROW1:	.WORD 0
-NEW_ROW2:	.WORD 0
-; void moveTurret(char key, int x)
 
 ; void play()
 
