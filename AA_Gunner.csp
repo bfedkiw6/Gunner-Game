@@ -177,6 +177,20 @@ MOVE_DONE:	ADS#	2	; Remove parameters for clear from stack
 	FIN#	0
 	RTN
 
+	; Random function from pong
+	.EQU	RANDOMMAX, 2
+RANDOM:	BGN#	0
+	LDA 	SEED
+	MUL#	2779
+	ADA#	1997
+	MOD#	2048
+	STA	SEED
+	INC	!RANDOMMAX
+	MOD	!RANDOMMAX
+	FIN#	0
+	RTN
+SEED:	.WORD 0
+
 ; void play()
 
 ; For timer and moving everything, we have to plan how things move
