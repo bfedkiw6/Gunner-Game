@@ -26,6 +26,7 @@
 
 	; Game Related .EQUs
 	.EQU	GROUND_CHAR, $2D	; ASCII for "-"
+	.EQU	PROJ_CHAR, $A6
 	; We may need multiple delays to have things move at different speeds
 	; May need to test different delays to see how long in real time it takes
 	; Delay at start of each level (maybe 2-5 seconds long, constant)
@@ -43,10 +44,10 @@ SETUP:	LDS# 	$E00
 	LDA#	INTERRUPT_ENA
 	OUTB	KBD_CNTL
 	; Timer setup
-	LDA	DELAY
-	OUTW  TIM_VALUE		
-	LDA#	ENABLE_RESET_AND_START
-	OUTB 	TIM_CNTL  
+	;LDA	DELAY
+	;OUTW  TIM_VALUE		
+	;LDA#	ENABLE_RESET_AND_START
+	;OUTB 	TIM_CNTL  
 	SIE
 	; Load initial stage
 	; Probably just the ground, ship, score, level
@@ -113,40 +114,50 @@ LEVEL_STR2:	.WORD	'el:'
 
 	; Work in progress
 	; Need to figure out how to initialize and move projectiles
-	.EQU	S_SHIP_R1, 3
-	.EQU	S_PROJ,2
+	.EQU	S_PROJ, 3
+	.EQU	S_SHIP_R1, 2
 SHOOT:	BGN# 	0
 	PSHA
 	PSHX
 	; Display projectile if there is open spot above ship
 	LDX#	9
-CHECK_PROJ:	LDA&	!PROJECTILES
+CHECK_PROJ:	LDA&	!S_PROJ
 	CMA#	0	; See if position in projectile array is free
 	JNE	CONTINUE	
 	STX	FREE_POS
-CONTINUE:	CMA	!SHIP_R1-38
-	JEQ	DONE	; Space is not free above ship
-	SOJ	CHECK_PROJ
+CONTINUE:	CMA#	$100 + (10 * CRT_COLS)
+	JLT	SUB_JUMP
+	CMA# 	$100 + (10 * CRT_COLS) + CRT_COLS
+	JLE	DONE	; Space is not free above ship	
+SUB_JUMP:	SOJ	CHECK_PROJ
 	; Open space above ship	
 ADD_PROJ:	LDX	FREE_POS
-	LDA 	!SHIP_R1-38
-	STA&	!PROJECTILES
-DONE:	POPX
+	LDA	!S_SHIP_R1
+	SBA#	38
+	STA	ABOVE_SHIP
+	LDA 	ABOVE_SHIP
+	STA&	!S_PROJ
+DONE:	PSH#	S_PROJ
+	JSR	DISPLAY
+	ADS#	1
+	POPX
 	POPA
 	FIN# 	0
 	RTN
 FREE_POS:	.WORD	0
+ABOVE_SHIP:	.WORD 0
 
 	; Display projectiles
+	.EQU	D_PROJ, 2
 DISPLAY:	BGN#	0
 	PSHA	
 	PSHX
 	LDX#	0
-	LDA#  $A6
-DISPLAY_PROJ:	LDA+	PROJECTILES
+DISPLAY_PROJ:	LDA&	!D_PROJ
 	STA	CURR_PORT
+	LDA#  PROJ_CHAR
 	OUTB*	CURR_PORT
-	AOC	10
+	AOC#	10
 	JNE	DISPLAY_PROJ
 	POPX
 	POPA
@@ -269,8 +280,8 @@ KBD_ISR:	PSHA
 	JEQ 	MOVEMENT	; Control sequence must be a ship move
 	CMA# 	$20
 	JNE 	KBD_DONE
-	PSH#	SHIP_R1
 	PSH#	PROJECTILES
+	PSH	SHIP_R1
 	JSR	SHOOT
 	ADS#	2
 MOVEMENT:	INB 	KBD_DATA
@@ -301,30 +312,30 @@ KBD_DONE:	LDA#	INTERRUPT_ENA	; Re-enable KBD interrupts
 ; If not, return
 ; If so, check against each action and trigger when met number of cycles
 ; Reset TIMER when it has triggered ENEMY_DELAY (the longest action delay)
-TIMER_ISR: 	PSHA
-	PSHX
-	JSR 	MOVE_PROJ	; Move projectile(s)
-	LDX# 	0
-BOMB_ACTION:	INC+  TIMERS
-          	LDA+	TIMERS
-	CMA#	BOMB_DELAY
-	JLT	ENEMY_ACTION
-	CLR+	TIMERS
-	JSR	MOVE_BOMBS
-	ADX#	1
-ENEMY_ACTION:	INC+	TIMERS
-	LDA+	TIMERS
-	CMA	ENEMY_DELAY
-	JLT	HIT_CHECKS
-	CLR+	TIMERS
-	JSR	MOVE_ENEMIES
-	ADX#	1
-HIT_CHECKS:	JSR	CHECK_HITS	; Hit logic
-TIMER_DONE:	LDA#	ENABLE_AND_RESET
-          	OUTB	TIM_CNTL
-	POPX
-          	POPA
-          	IRTN		; END OF TIMER_ISR
+;TIMER_ISR: 	PSHA
+;	PSHX
+;	JSR 	MOVE_PROJ	; Move projectile(s)
+;	LDX# 	0
+;BOMB_ACTION:	INC+  TIMERS
+;          	LDA+	TIMERS
+;	CMA#	BOMB_DELAY
+;	JLT	ENEMY_ACTION
+;	CLR+	TIMERS
+;	JSR	MOVE_BOMBS
+;	ADX#	1
+;ENEMY_ACTION:	INC+	TIMERS
+;	LDA+	TIMERS
+;	CMA	ENEMY_DELAY
+;	JLT	HIT_CHECKS
+;	CLR+	TIMERS
+;	JSR	MOVE_ENEMIES
+;	ADX#	1
+;HIT_CHECKS:	JSR	CHECK_HITS	; Hit logic
+;TIMER_DONE:	LDA#	ENABLE_AND_RESET
+;          	OUTB	TIM_CNTL
+;	POPX
+;          	POPA
+;          	IRTN		; END OF TIMER_ISR
 	; Timers in order of bombs, enemy ships
 TIMERS:	.BLKW	4, 0
 DELAY:	.WORD 800	; Game base speed
@@ -335,4 +346,4 @@ ENEMY_DELAY:	.WORD	$10	; # of iters before enemy ships move
 	.EQU @, $FF8
 	.WORD KBD_ISR
 	.EQU @, $FFB
-	.WORD	TIMER_ISR
+;	.WORD	TIMER_ISR
