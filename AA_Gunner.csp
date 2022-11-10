@@ -24,15 +24,22 @@
 	.EQU 	ENABLE_RESET_AND_START, $D0
 	.EQU 	ENABLE_AND_RESET, $C0
 
-
 	; Game Related .EQUs
 	.EQU	GROUND_CHAR, $2D	; ASCII for "-"
+	.EQU	PLAY_DELAY, 1 ; # of timer iterations before projectile moves
+	.EQU	WINNER_DELAY, 10; # of timer iterations while winner shown
 
 SETUP:	LDS# 	$E00
 	; Keyboard setup
 	LDA#	INTERRUPT_ENA
 	OUTB	KBD_CNTL
 	; Timer setup
+	LDA	DELAY
+	OUTW  TIM_VALUE
+	LDA#	TIMERISR
+	STA 	$FFB		
+	LDA#	ENABLE_RESET_AND_START
+	OUTB 	TIM_CNTL  
 	SIE
 	; Load initial stage
 	; Probably just the ground, ship, score, level
@@ -42,6 +49,7 @@ LOOP:	NOP
 	JMP	LOOP
 	HLT
 
+DELAY:	.WORD	$200
 ; Stores the ports for ^ and the left | of the ship/AA gun
 SHIP_R1:	.WORD $100 + (11 * CRT_COLS) + (CRT_COLS/2) - 1
 SHIP_R2:	.WORD $100 + (12*CRT_COLS) + (CRT_COLS/2) - 2
@@ -195,6 +203,27 @@ SEED:	.WORD 0
 
 ; For timer and moving everything, we have to plan how things move
 ; and how to decide what direction something moves in
+; Timer altered from pong code
+TIMERISR: 	PSHA
+          	INC   TIMER
+          	LDA	TIMER
+	CMA	TIMER_CNT
+	JLT	TIMER_DONE
+	CMA#	WINNER_DELAY
+	JNE	TIMER1
+	LDA#	PLAY_DELAY	; set timer play since just announced winner
+	STA	TIMER_CNT		
+	JSR	START_GAME	
+	JMP	TIMER3	; game just started now
+TIMER1:	JSR	PLAY	
+TIMER3:	LDA#	0
+	CLR	TIMER	; reset timer count
+TIMER_DONE:	LDA#	ENABLE_AND_RESET
+          	OUTB	TIM_CNTL
+          	POPA
+          	IRTN		; END OF TIMERISR
+TIMER:	.WORD	0
+TIMER_CNT:	.WORD	PLAY_DELAY
 
 	; ISRs
 	.EQU	@, $300
