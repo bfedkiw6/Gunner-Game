@@ -127,7 +127,7 @@ CHECK_PROJ:	LDA&	!S_PROJ
 	STX	FREE_POS
 CONTINUE:	CMA#	$100 + (10 * CRT_COLS)
 	JLT	SUB_JUMP
-	CMA# 	$100 + (10 * CRT_COLS) + CRT_COLS
+	CMA# 	$100 + (10 * CRT_COLS) + (CRT_COLS-1)
 	JLE	DONE	; Space is not free above ship	
 SUB_JUMP:	SOJ	CHECK_PROJ
 	; Open space above ship	
