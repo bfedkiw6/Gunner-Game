@@ -26,20 +26,27 @@
 
 	; Game Related .EQUs
 	.EQU	GROUND_CHAR, $2D	; ASCII for "-"
-	.EQU	PLAY_DELAY, 1 ; # of timer iterations before projectile moves
-	.EQU	WINNER_DELAY, 10; # of timer iterations while winner shown
+	; We may need multiple delays to have things move at different speeds
+	; May need to test different delays to see how long in real time it takes
+	; Delay at start of each level (maybe 2-5 seconds long, constant)
+	; Delay for projectiles (constant)
+	; Delay for bombs (constant)
+	; Delay for enemy aircraft that changes based on time so need a word
+	.EQU 	STARTLVL_DELAY, 8	; # of timer iters displaying level
+	.EQU	BEATLVL_DELAY, 10	; # of timer iters displaying cleared msg
+	.EQU	PROJ_DELAY, 1 	; # of timer iters before projectiles move
+	.EQU 	BOMB_DELAY, 5	; # of timer iters before dropped bombs move
+
 
 SETUP:	LDS# 	$E00
 	; Keyboard setup
 	LDA#	INTERRUPT_ENA
 	OUTB	KBD_CNTL
 	; Timer setup
-	;LDA	DELAY
-	;OUTW  TIM_VALUE
-	;LDA#	TIMERISR
-	;STA 	$FFB		
-	;LDA#	ENABLE_RESET_AND_START
-	;OUTB 	TIM_CNTL  
+	LDA	DELAY
+	OUTW  TIM_VALUE		
+	LDA#	ENABLE_RESET_AND_START
+	OUTB 	TIM_CNTL  
 	SIE
 	; Load initial stage
 	; Probably just the ground, ship, score, level
@@ -49,20 +56,17 @@ LOOP:	NOP
 	JMP	LOOP
 	HLT
 
-DELAY:	.WORD	$200
 ; Stores the ports for ^ and the left | of the ship/AA gun
 SHIP_R1:	.WORD $100 + (11 * CRT_COLS) + (CRT_COLS/2) - 1
 SHIP_R2:	.WORD $100 + (12*CRT_COLS) + (CRT_COLS/2) - 2
 PROJECTILES:	.BLKW	10, 0
+SHIP_HEALTH:	.WORD 5
+
 	; Subroutines
 	.EQU	@, $200
 
 	; void startGame()
 	; Loads graphics
-	; Need to go through first row and load score and level
-	; Score: ######	Lvl: ##
-	; Ground can be ------ or _____ see what looks better
-
 START_GAME:	BGN#  0
 	PSHA
 	PSHX 
@@ -238,47 +242,22 @@ MOVE_DONE:	ADS#	2	; Remove parameters for clear from stack
 	RTN
 
 	; Random function from pong
-	.EQU	RANDOMMAX, 2
+	.EQU	RANDOM_MAX, 2
 RANDOM:	BGN#	0
 	LDA 	SEED
 	MUL#	2779
 	ADA#	1997
 	MOD#	2048
 	STA	SEED
-	INC	!RANDOMMAX
-	MOD	!RANDOMMAX
+	INC	!RANDOM_MAX
+	MOD	!RANDOM_MAX
 	FIN#	0
 	RTN
 SEED:	.WORD 0
 
-; void play()
-
-; For timer and moving everything, we have to plan how things move
-; and how to decide what direction something moves in
-; Timer altered from pong code
-;TIMERISR: 	PSHA
-;          	INC   TIMER
-;          	LDA	TIMER
-;	CMA	TIMER_CNT
-;	JLT	TIMER_DONE
-;	CMA#	WINNER_DELAY
-;	JNE	TIMER1
-;	LDA#	PLAY_DELAY	; set timer play since just announced winner
-;	STA	TIMER_CNT		
-;	JSR	START_GAME	
-;	JMP	TIMER3	; game just started now
-;TIMER1:	JSR	PLAY	
-;TIMER3:	LDA#	0
-;	CLR	TIMER	; reset timer count
-;TIMER_DONE:	LDA#	ENABLE_AND_RESET
-;          	OUTB	TIM_CNTL
-;          	POPA
-;          	IRTN		; END OF TIMERISR
-;TIMER:	.WORD	0
-;TIMER_CNT:	.WORD	PLAY_DELAY
-
 	; ISRs
 	.EQU	@, $300
+
 	; Keyboard ISR for player controls
 	.EQU	LEFT, 1
 	.EQU 	RIGHT, 2
@@ -287,7 +266,7 @@ KBD_ISR:	PSHA
 	OUTB	KBD_CNTL
 	INB	KBD_DATA
 	CMA#	$1B
-	JEQ 	MOVEMENT
+	JEQ 	MOVEMENT	; Control sequence must be a ship move
 	CMA# 	$20
 	JNE 	KBD_DONE
 	PSH#	SHIP_R1
@@ -311,11 +290,49 @@ KBD_DONE:	LDA#	INTERRUPT_ENA	; Re-enable KBD interrupts
 	POPA
 	IRTN
 
+; For timer and moving everything, we have to plan how things move
+; and how to decide what direction something moves in
+	; Need to decide on a timer count and have objects
+	; move every time count finishes (causing interrupt)
+	; Timer altered from pong code
+; TIMER stores the number of timer cycles
+; After each timer cycle, check if the timer has reached the minimum action delay
+; Make minimum action delay how long each cycle takes? (probably
+; If not, return
+; If so, check against each action and trigger when met number of cycles
+; Reset TIMER when it has triggered ENEMY_DELAY (the longest action delay)
+TIMER_ISR: 	PSHA
+	PSHX
+	JSR 	MOVE_PROJ	; Move projectile(s)
+	LDX# 	0
+BOMB_ACTION:	INC+  TIMERS
+          	LDA+	TIMERS
+	CMA#	BOMB_DELAY
+	JLT	ENEMY_ACTION
+	CLR+	TIMERS
+	JSR	MOVE_BOMBS
+	ADX#	1
+ENEMY_ACTION:	INC+	TIMERS
+	LDA+	TIMERS
+	CMA	ENEMY_DELAY
+	JLT	HIT_CHECKS
+	CLR+	TIMERS
+	JSR	MOVE_ENEMIES
+	ADX#	1
+HIT_CHECKS:	JSR	CHECK_HITS	; Hit logic
+TIMER_DONE:	LDA#	ENABLE_AND_RESET
+          	OUTB	TIM_CNTL
+	POPX
+          	POPA
+          	IRTN		; END OF TIMER_ISR
+	; Timers in order of bombs, enemy ships
+TIMERS:	.BLKW	4, 0
+DELAY:	.WORD 800	; Game base speed
+ENEMY_DELAY:	.WORD	$10	; # of iters before enemy ships move
+
+
+	; Interrupt Vector
 	.EQU @, $FF8
 	.WORD KBD_ISR
-
-; /\
-;|--|
-
-; ^
-;|-|
+	.EQU @, $FFB
+	.WORD	TIMER_ISR
