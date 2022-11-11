@@ -60,7 +60,7 @@ LOOP:	NOP
 ; Stores the ports for ^ and the left | of the ship/AA gun
 SHIP_R1:	.WORD $100 + (11 * CRT_COLS) + (CRT_COLS/2) - 1
 SHIP_R2:	.WORD $100 + (12*CRT_COLS) + (CRT_COLS/2) - 2
-PROJECTILES:	.BLKW	10, 0
+PROJECTILES:	.BLKW	10, ' '
 SHIP_HEALTH:	.WORD 5
 
 	; Subroutines
@@ -122,7 +122,7 @@ SHOOT:	BGN# 	0
 	; Display projectile if there is open spot above ship
 	LDX#	9
 CHECK_PROJ:	LDA&	!S_PROJ
-	CMA#	0	; See if position in projectile array is free
+	CMA#	' '	; See if position in projectile array is free
 	JNE	CONTINUE	
 	STX	FREE_POS
 CONTINUE:	CMA#	$100 + (10 * CRT_COLS)
@@ -137,13 +137,40 @@ ADD_PROJ:	LDX	FREE_POS
 	STA	ABOVE_SHIP
 	LDA 	ABOVE_SHIP
 	STA&	!S_PROJ
-DONE:	
-	POPX
+DONE:	POPX
 	POPA
 	FIN# 	0
 	RTN
 FREE_POS:	.WORD	0
 ABOVE_SHIP:	.WORD 0
+
+	; Get new position for each projectile
+	.EQU	M_PROJ, 2
+MOVE_PROJ:	BGN# 	0
+	PSHA
+	PSHX
+	PSH#	!M_PROJ	
+	JSR	CLEAR
+	ADS#	1
+	LDX#	0
+MOVING:	LDA&	!D_PROJ	; Get projectile and shift it up a row
+	SBA#	38
+	CMA#	$100	; See if it is out of screen
+	JLT	RESET		
+	STA&	M_PROJ	; Not out of screen, save new loation
+	JMP	CHECK_INDEX	
+RESET:	LDA#	' '	; If projectile is out of screen, reset it in array
+	STA&	M_PROJ
+CHECK_INDEX:	AOC#	10
+	JNE	MOVING
+	PSH#	!M_PROJ
+	JSR	DISPLAY
+	ADS#	1
+	POPX	
+	POPA
+	FIN#	0 	
+	RTN
+M_CURR_PORT:	.WORD	0
 
 	; Display projectiles
 	.EQU	D_PROJ, 2
@@ -152,33 +179,34 @@ DISPLAY:	BGN#	0
 	PSHX
 	LDX#	0
 DISPLAY_PROJ:	LDA&	!D_PROJ
-	STA	CURR_PORT
+	STA	D_CURR_PORT
 	LDA#  PROJ_CHAR
-	OUTB*	CURR_PORT
+	OUTB*	D_CURR_PORT
 	AOC#	10
 	JNE	DISPLAY_PROJ
 	POPX
 	POPA
 	FIN# 	0
 	RTN
-CURR_PORT:	.WORD	0
+D_CURR_PORT:	.WORD	0
 
-	; Get new projectile position
-;	.EQU	NEWPOSPROJY, 2
-;NEWPOS:	BGN# 	0
-;	PSHA
-;	LDA* !NEWPOSPROJY
-;	ADA# 	1 ; CHANGE THIS DEPENDING ON HOW FAST WE WANT PROJECTILE TO SHOOT
-;	STA* !NEWPOSPROJY
-;	; CHECK IF PROJECTILE IS OFF TOP OF SCREEN
-;	CMA#	0
-	; PROJECTILE OFF SCREEN, NO LONGER DISPLAY IT
-;	JSR	CLEAR_BULLET
-;	JMP	COMPLETE	
-;COMPLETE:	POPA
-;	FIN# 	0
-;	RTN
-
+	; Clear projectiles from screen, not array
+	.EQU	C_PROJ, 2
+CLEAR:	BGN#	0
+	PSHA	
+	PSHX
+	LDX#	0
+CLEAR_PROJ:	LDA&	!C_PROJ
+	STA	C_CURR_PORT
+	LDA#	' '
+	OUTB*	D_CURR_PORT
+	AOC#	10
+	JNE	CLEAR_PROJ
+	POPX
+	POPA
+	FIN# 	0
+	RTN
+C_CURR_PORT:	.WORD	0
 
 	; Displays ship at ports
 	; Uses global ship variables
