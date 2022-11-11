@@ -127,12 +127,18 @@ CHECK_ABOVE:	CMA#	$100 + (10 * CRT_COLS)
 SUB_JUMP:	SOJ	CHECK_PROJ	; Port is in row above ship, check next element
 	; Open space above ship	
 ADD_PROJ:	LDA	!S_SHIP_R1
-	;SBA#	38
+	SBA#	38
 	STA&	!S_PROJ
+	; Small hack to get the projectile to display right above the ship
+	; since move moves before displaying
+	STA	S_PORT
+	LDA#	PROJ_CHAR
+	OUTB*	S_PORT
 DONE:	POPX
 	POPA
 	FIN# 	0
 	RTN
+S_PORT:	.WORD	0
 
 	; Get new position for each projectile
 	.EQU	M_PROJ, 2
@@ -160,7 +166,7 @@ CHECK_INDEX:	AOC#	10
 	FIN#	0 	
 	RTN
 
-	; Display projectiles (Should be good)
+	; Display projectiles
 	.EQU	D_PROJ, 2
 DISPLAY_PROJ:	BGN#	0
 	PSHA	
@@ -178,7 +184,7 @@ DP_LOOP:	LDA&	!D_PROJ
 	RTN
 D_CURR_PORT:	.WORD	0
 
-	; Clear projectiles from screen, not array (Should be good)
+	; Clear projectiles from screen, not array
 	.EQU	C_PROJ, 2
 CLEAR_PROJ:	BGN#	0
 	PSHA
@@ -187,7 +193,7 @@ CLEAR_PROJ:	BGN#	0
 CP_LOOP:	LDA&	!C_PROJ
 	STA	C_CURR_PORT
 	LDA#	' '
-	OUTB*	D_CURR_PORT
+	OUTB*	C_CURR_PORT
 	AOC#	10
 	JLT	CP_LOOP
 	POPX
@@ -354,7 +360,7 @@ TIMER_DONE:	LDA#	ENABLE_AND_RESET
           	IRTN		; END OF TIMER_ISR
 	; Timers in order of bombs, enemy ships
 TIMERS:	.BLKW	4, 0
-DELAY:	.WORD 800	; Game base speed
+DELAY:	.WORD 1000	; Game base speed
 ENEMY_DELAY:	.WORD	$10	; # of iters before enemy ships move
 
 
