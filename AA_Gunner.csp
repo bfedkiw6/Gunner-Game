@@ -53,7 +53,22 @@ SETUP:	LDS# 	$E00
 	; Probably just the ground, ship, score, level
 	; Let the user have maybe 5 seconds before ships start spawning in
 MAIN:	JSR	START_GAME
-	ADS#	1	
+	ADS#	1
+
+; Attempt to test move ship - not currently working
+;	PSH#	$172
+;	JSR	DISPLAY_ENMY
+;	ADS#	1
+;RAND_LOOP:	INC 	COUNTER
+;	PSH#	SPEED1
+;	PSH#	1
+;	JSR	MOVE_ENMY
+;	ADS#	2
+;	LDA	COUNTER
+;	CMA#	38
+;	JNE	RAND_LOOP
+;COUNTER:	.WORD	0
+	
 LOOP:	NOP
 	JMP	LOOP
 	HLT
@@ -207,6 +222,64 @@ CP_LOOP:	LDA&	!C_PROJ
 	RTN
 C_CURR_PORT:	.WORD	0
 
+	; Move enemy ships
+	.EQU	M_ENEMIES, 3
+	.EQU	DIRECTION, 2
+MOVE_ENMY:	BGN# 	0
+	PSHA
+	PSHX
+CLR_ENEMIES:	PSH#	!M_ENEMIES
+	PSH	M_INDEX
+	PSH#	0	
+	JSR	CLEAR_ENMY	; Clear current ships
+	ADS#	3
+	INC	M_INDEX
+	LDA	M_INDEX
+	CMA#	12
+	JNE	CLR_ENEMIES	
+	LDX#	0
+	LDA	!DIRECTION
+	CMA#	1
+	JEQ	MOVE_RIGHT	; If direction = 1, move ships right
+MOVE_LEFT:	LDA&	!M_ENEMIES	; Shift ships to the left
+	SBA#	1
+	STA	CURR_PORT
+	SBA#	$100	; See if it is out of screen on left
+	MOD#	38
+	CMA#	0	
+	JEQ	RESET1		
+	STA&	CURR_PORT	; Not out of screen, save new loation
+	JMP	CHECK_INDX1	
+RESET1:	CLR&	!M_ENEMIES	; If proj goes out of screen, clear in array
+CHECK_INDX1:	AOC#	12
+	JLT	MOVE_LEFT
+	JMP	NEW_DISPLAY			
+MOVE_RIGHT:	LDA&	!M_ENEMIES	; Shift ships to the right
+	ADA#	1
+	STA	CURR_PORT
+	SBA#	$125	; See if it is out of screen on right
+	MOD#	38
+	CMA#	0	
+	JEQ	RESET2		
+	STA&	CURR_PORT	; Not out of screen, save new loation
+	JMP	CHECK_INDX2	
+RESET2:	CLR&	!M_ENEMIES	; If proj goes out of screen, clear in array
+CHECK_INDX2:	AOC#	12
+	JLT	MOVE_RIGHT
+NEW_DISPLAY:	LDX#	0
+DISPLAY_ALL:	LDA&	!M_ENEMIES
+	STA	M_ENMY_PORT
+	PSH	M_ENMY_PORT
+	JSR	DISPLAY_ENMY	; Redisplay ships at new ports
+	ADS#	1
+	POPX	
+	POPA
+	FIN#	0 	
+	RTN
+M_INDEX:	.WORD	0
+M_ENMY_PORT:	.WORD	0
+CURR_PORT:	.WORD	0
+
 	; Display enemy ship
 	.EQU	D_ENMY_PORT, 2
 DISPLAY_ENMY:	BGN#	0
@@ -225,26 +298,26 @@ DISPLAY_ENMY:	BGN#	0
 	RTN
 
 	; Clear enemy ship from screen (also possibly from array)
-	.EQU	C_ENEMY, 4
-	.EQU	INDEX, 3
+	.EQU	C_ENEMIES, 4
+	.EQU	C_INDEX, 3
 	.EQU	HIT, 2
 CLEAR_ENMY:	BGN#	0
 	PSHA
 	PSHX
-	LDX	!INDEX
-	LDA&	!C_ENEMY
+	LDX	!C_INDEX
+	LDA&	!C_ENEMIES
 	STA	C_ENMY_PORT
 	LDX#	0
-	LDA# 	' '	; Clear previous enemy ship positions
+	LDA# 	' '	; Clear previous enemy ship position
 CLEAR_ALL:	OUTB&	C_ENMY_PORT
 	AOC#	3
 	JLT	CLEAR_ALL
 	LDA	!HIT	; See if ship was hit and needs to be cleared from array
 	CMA#	1
 	JNE	EXIT_CLEAR
-	LDX	!INDEX
+	LDX	!C_INDEX
 	LDA#	0
-	STA&	!C_ENEMY
+	STA&	!C_ENEMIES
 EXIT_CLEAR:	POPX
 	POPA
 	FIN# 	0
