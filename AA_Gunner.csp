@@ -52,16 +52,21 @@ SETUP:	LDS# 	$E00
 	; Load initial stage
 	; Probably just the ground, ship, score, level
 	; Let the user have maybe 5 seconds before ships start spawning in
-MAIN:	JSR START_GAME
+MAIN:	JSR	START_GAME
+	ADS#	1	
 LOOP:	NOP
 	JMP	LOOP
 	HLT
-
 ; Stores the ports for ^ and the left | of the ship/AA gun
 SHIP_R1:	.WORD $100 + (11 * CRT_COLS) + (CRT_COLS/2) - 1
 SHIP_R2:	.WORD $100 + (12*CRT_COLS) + (CRT_COLS/2) - 2
 PROJECTILES:	.BLKW	10, 0
 SHIP_HEALTH:	.WORD 5
+SPEED1:	.BLKW	12, 0
+SPEED2:	.BLKW	12, 0
+SPEED3:	.BLKW	12, 0
+SPEED4:	.BLKW	12, 0
+SPEED5:	.BLKW	12, 0
 
 	; Subroutines
 	.EQU	@, $200
@@ -201,6 +206,50 @@ CP_LOOP:	LDA&	!C_PROJ
 	FIN# 	0
 	RTN
 C_CURR_PORT:	.WORD	0
+
+	; Display enemy ship
+	.EQU	D_ENMY_PORT, 2
+DISPLAY_ENMY:	BGN#	0
+	PSHA	
+	PSHX
+	LDX# 	1
+	LDA#	'o'
+	OUTB& !D_ENMY_PORT
+	LDA#	'|'	
+	OUTB*	!D_ENMY_PORT
+	ADX#	1		
+	OUTB&	!D_ENMY_PORT
+	POPX
+	POPA
+	FIN# 	0
+	RTN
+
+	; Clear enemy ship from screen (also possibly from array)
+	.EQU	C_ENEMY, 4
+	.EQU	INDEX, 3
+	.EQU	HIT, 2
+CLEAR_ENMY:	BGN#	0
+	PSHA
+	PSHX
+	LDX	!INDEX
+	LDA&	!C_ENEMY
+	STA	C_ENMY_PORT
+	LDX#	0
+	LDA# 	' '	; Clear previous enemy ship positions
+CLEAR_ALL:	OUTB&	C_ENMY_PORT
+	AOC#	3
+	JLT	CLEAR_ALL
+	LDA	!HIT	; See if ship was hit and needs to be cleared from array
+	CMA#	1
+	JNE	EXIT_CLEAR
+	LDX	!INDEX
+	LDA#	0
+	STA&	!C_ENEMY
+EXIT_CLEAR:	POPX
+	POPA
+	FIN# 	0
+	RTN
+C_ENMY_PORT:	.WORD	0
 
 	; Displays ship at ports
 	; Uses global ship variables
