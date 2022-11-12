@@ -75,7 +75,7 @@ SPEEDL2:	.BLKW	12, 0
 SPEEDL3:	.BLKW	12, 0
 
 	; Subroutines
-	.EQU	@, $300
+	.EQU	@, $100
 
 	; Initializes graphics and starts game
 START_GAME:	BGN#  0
@@ -587,6 +587,7 @@ TIMER_ISR: 	PSHA
 	PSHA
 	JSR	SPAWN
 	ADS#	1
+	INC	NUM_ENEMIES
 ;BOMB_ACTION:	ADX#	1
 ;	INC+  TIMERS
 ;          	LDA+	TIMERS
