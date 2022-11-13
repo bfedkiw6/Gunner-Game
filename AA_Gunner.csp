@@ -269,8 +269,9 @@ NEW_DISPLAY:	LDX#	0
 DISPLAY_ALL:	LDA&	!M_ENEMIES
 	STA	M_ENMY_PORT
 	PSH	M_ENMY_PORT
+	PSH	!DIRECTION
 	JSR	DISPLAY_ENEMY	; Redisplay ships at new ports
-	ADS#	1
+	ADS#	2
 	POPX	
 	POPA
 	FIN#	0 	
@@ -280,26 +281,17 @@ M_ENMY_PORT:	.WORD	0
 CURR_PORT:	.WORD	0
 
 	; Display enemy ship
-	.EQU	D_ENMY_PORT, 2
+	.EQU	D_ENMY_PORT, 3
+	.EQU	D_DIRECTION, 2
 DISPLAY_ENEMY:	BGN#	0
 	PSHA	
 	PSHX
 	LDA	!D_ENMY_PORT
 	STA	TEMP_PORT_R
 	STA	TEMP_PORT_L
-	; Looking at left of screen
-	LDA	TEMP_PORT_R
-	ADA#	2	
-	SBA#	$100	; See if right of ship is at leftmost spot on sceen
-	MOD#	38
-	CMA#	0	
-	JEQ	PRINT_R
-	LDA	TEMP_PORT_R
-	ADA#	1	
-	SBA#	$100	; See if right of ship is 1 right of leftmost spot on screen
-	MOD#	38
-	CMA#	0
-	JEQ	PRINT_MID_R
+	LDA	!D_DIRECTION
+	CMA#	1
+	JEQ	MOVE_R
 	; Looking at right of screen
 	LDA	TEMP_PORT_L	
 	SBA#	$125	; See if left of ship is at rightmost spot on screen
@@ -312,6 +304,19 @@ DISPLAY_ENEMY:	BGN#	0
 	MOD#	38
 	CMA#	0	
 	JEQ	PRINT_MID_L
+	; Looking at left of screen
+MOVE_R:	LDA	TEMP_PORT_R
+	ADA#	2	
+	SBA#	$100	; See if right of ship is at leftmost spot on sceen
+	MOD#	38
+	CMA#	0	
+	JEQ	PRINT_R
+	LDA	TEMP_PORT_R
+	ADA#	1	
+	SBA#	$100	; See if right of ship is 1 right of leftmost spot on screen
+	MOD#	38
+	CMA#	0
+	JEQ	PRINT_MID_R
 	; Print all characters, nothing offscreen
 	LDX# 	1
 	LDA#	'o'
@@ -415,7 +420,7 @@ GET_ROW:	STA	S_SPEED_ARR
 	JLT	S_LESS
 	LDA#	$125	; Port = $125 + ACC * 38 if from right
 	JMP 	S_CONT
-S_LESS:	LDA#	$100	; Port = $100 + ACC * 38 if from left
+S_LESS:	LDA#	$FE	; Port = $100 + ACC * 38 if from left
 S_CONT:	ADA	S_ROW
 	STA	S_ROW
 	LDX#	0
