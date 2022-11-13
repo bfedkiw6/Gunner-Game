@@ -287,28 +287,28 @@ DISPLAY_ENEMY:	BGN#	0
 	LDA	!D_ENMY_PORT
 	STA	TEMP_PORT_R
 	STA	TEMP_PORT_L
-	; Looking at right of ship
+	; Looking at left of screen
 	LDA	TEMP_PORT_R
 	ADA#	2	
-	SBA#	$100	; See if left & middle of ship it is out of screen on left
+	SBA#	$100	; See if right of ship is at leftmost spot on sceen
 	MOD#	38
 	CMA#	0	
 	JEQ	PRINT_R
 	LDA	TEMP_PORT_R
 	ADA#	1	
-	SBA#	$100	; See if left of ship is out of screen on left
+	SBA#	$100	; See if right of ship is 1 right of leftmost spot on screen
 	MOD#	38
 	CMA#	0
 	JEQ	PRINT_MID_R
-	; Looking at left of ship
+	; Looking at right of screen
 	LDA	TEMP_PORT_L	
-	SBA#	$125	; See if right & middle of ship is out of screen on right
+	SBA#	$125	; See if left of ship is at rightmost spot on screen
 	MOD#	38
 	CMA#	0	
 	JEQ	PRINT_L
 	LDA	TEMP_PORT_L
 	ADA#	1	
-	SBA#	$125	; See if right of ship is out of screen on right
+	SBA#	$125	; See if left of ship is 1 left of rightmost spot on screen
 	MOD#	38
 	CMA#	0	
 	JEQ	PRINT_MID_L
