@@ -35,12 +35,11 @@
 	; Delay for enemy aircraft that changes based on time so need a word
 	.EQU 	STARTLVL_DELAY, 8	; # of timer iters displaying level
 	.EQU	BEATLVL_DELAY, 10	; # of timer iters displaying cleared msg
-	.EQU	PROJ_DELAY, 1 	; # of timer iters before projectiles move
-	.EQU 	BOMB_DELAY, 5	; # of timer iters before dropped bombs move
-	.EQU 	SPAWN_DELAY, $10	; # of iters before enemy ships spawn
-	.EQU	SPD1_DELAY, $30	; # of iters before ships move w/ different speeds
-	.EQU	SPD2_DELAY, $20
-	.EQU	SPD3_DELAY, $10
+	.EQU 	BOMB_DELAY, 3	; # of timer iters before dropped bombs move
+	.EQU 	SPAWN_DELAY, 5	; # of iters before enemy ships spawn
+	.EQU	SPD1_DELAY, 9	; # of iters before ships move w/ different speeds
+	.EQU	SPD2_DELAY, 6
+	.EQU	SPD3_DELAY, 2
 
 SETUP:	LDS# 	$E00
 	; Keyboard setup
@@ -56,23 +55,18 @@ SETUP:	LDS# 	$E00
 	; Probably just the ground, ship, score, level
 	; Let the user have maybe 5 seconds before ships start spawning in
 MAIN:	JSR	START_GAME
-	ADS#	1
-	
 LOOP:	NOP
 	JMP	LOOP
 	HLT
+DELAY:	.WORD 2000	; Game base speed
 ; Stores the ports for ^ and the left | of the ship/AA gun
 SHIP_R1:	.WORD $100 + (11 * CRT_COLS) + (CRT_COLS/2) - 1
 SHIP_R2:	.WORD $100 + (12*CRT_COLS) + (CRT_COLS/2) - 2
 PROJECTILES:	.BLKW	10, 0
 SHIP_HEALTH:	.WORD 5
 NUM_ENEMIES:	.WORD	0
-SPEEDR1:	.BLKW	12, 0
-SPEEDR2:	.BLKW	12, 0
-SPEEDR3:	.BLKW	12, 0
-SPEEDL1:	.BLKW	12, 0
-SPEEDL2:	.BLKW	12, 0
-SPEEDL3:	.BLKW	12, 0
+ENEMY_SHIPS:	.BLKW	7, 0
+ENEMY_SPDS:	.BLKW	7, 0
 
 	; Subroutines
 	.EQU	@, $100
@@ -83,24 +77,24 @@ START_GAME:	BGN#  0
 	PSHX 
 	; Print Score
 	LDX#	0
-PRINT_SCORE:	LDC	SCORE_STR
+PRINT_SCORE:	LDC	SCORE_STR	; Print "Score:"
 	OUTB+	CRT_VBUF
-	AOC#	6	; Check if all characters are printed
+	AOC#	6
 	JNE	PRINT_SCORE
 	LDA# '0'
-SCORE_PT2:	OUTB+ CRT_VBUF
+SCORE_PT2:	OUTB+ CRT_VBUF	; Print numbers for the score
 	AOC# 16
 	JLT SCORE_PT2
 	; Print level
 	LDX#  0	
-PRINT_LEVEL:	LDC	LEVEL_STR
+PRINT_LEVEL:	LDC	LEVEL_STR	; Print "Level:"
 	; To not overwrite Score, shift over XR (leave room for the level #)
 	ADX#	30
 	OUTB+	CRT_VBUF
 	; Return back to original XR so next character can be gotten
 	SBX#	30
-	AOC#	6	; Check if all characters are printed
-	JNE	PRINT_LEVEL
+	AOC#	6
+	JNE	PRINT_LEVEL	; Print numbers for level
 PRINT_PT2:	LDA# '0'
 	OUTB	LEVEL
 	LDA# '1'
@@ -219,17 +213,14 @@ C_CURR_PORT:	.WORD	0
 MOVE_ENEMY:	BGN# 	0
 	PSHA
 	PSHX
-	LDA#	0	; Reset Index
-	STA	M_INDEX
+	LDX#	0	; Reset Index
 CLR_ENEMIES:	PSH	!M_ENEMIES
-	PSH	M_INDEX
+	PSHX
 	PSH#	0	
 	JSR	CLEAR_ENEMY	; Clear current ships
 	ADS#	3
-	INC	M_INDEX
-	LDA	M_INDEX
-	CMA#	12
-	JNE	CLR_ENEMIES
+	AOC#	12
+	JLT	CLR_ENEMIES
 	LDA	!DIRECTION
 	CMA#	1	
 	LDX#	0
@@ -275,7 +266,6 @@ DISPLAY_ALL:	LDA&	!M_ENEMIES
 	POPA
 	FIN#	0 	
 	RTN
-M_INDEX:	.WORD	0
 M_ENMY_PORT:	.WORD	0
 CURR_PORT:	.WORD	0
 
@@ -377,36 +367,24 @@ EXIT_CLEAR:	POPX
 C_ENMY_PORT:	.WORD	0
 
 	; Spawns an enemy ship
-	.EQU SPEED, 2
+	.EQU 	SPEED, 4	; CBV
+	.EQU	ENEMY_ARR, 3	; CBA
+	.EQU	SPEED_ARR, 2	; CBA
 SPAWN:	BGN#	0
 	PSHA
 	PSHX
-	LDA	!SPEED
-	CMA#	0
-	JNE	ONE
-	LDA#	SPEEDR1
-	JMP	GET_ROW
-ONE:	CMA#	1
-	JNE	TWO
-	LDA#	SPEEDR2
-	JMP	GET_ROW
-TWO:	CMA#	2
-	JNE	THREE
-	LDA#	SPEEDR3
-	JMP	GET_ROW
-THREE:	CMA# 	3
-	JNE	FOUR
-	LDA#	SPEEDL1
-	JMP	GET_ROW
-FOUR:	CMA#	4
-	JNE 	FIVE
-	LDA#	SPEEDL2
-	JMP	GET_ROW
-FIVE:	LDA#	SPEEDL3
-GET_ROW:	STA	S_SPEED_ARR
-	PSH#	5	; Get number between 1-6 inclusive
-	JSR	RANDOM
+	PSH#	5	; Get number between 0-5 inclusive
+	JSR	RANDOM	; This represents the row it goes on
 	ADS#	1
+	TAX
+CHECK_OPEN:	LDA&	!ENEMY_ARR	; Check if no enemy on row
+	CMA#	0
+	JEQ	ROW_GOOD	; XR will store the index to store at
+	AOC#	6
+	JLT	CHECK_OPEN
+	LDX#	0	; Reset to start of array if checking last element
+	JMP	CHECK_OPEN	
+ROW_GOOD:	TXA		; Get offset
 	ADA#	1
 	MUL# 	38
 	STA	S_ROW
@@ -415,25 +393,16 @@ GET_ROW:	STA	S_SPEED_ARR
 	JLT	S_LESS
 	LDA#	$125	; Port = $125 + ACC * 38 if from right
 	JMP 	S_CONT
-S_LESS:	LDA#	$100	; Port = $100 + ACC * 38 if from left
+S_LESS:	LDA#	$FE	; Port = $FE + ACC * 38 if from left
 S_CONT:	ADA	S_ROW
-	STA	S_ROW
-	LDX#	0
-S_PUSH:	LDA&	S_SPEED_ARR
-	CMA#	0
-	JEQ	S_EMPTY
-	AOC#	12
-	JLT	S_PUSH
-S_EMPTY:	TXA
-	ADA	S_SPEED_ARR
-	STA	S_SPEED_ARR
-	LDA	S_ROW
-	STA*	S_SPEED_ARR
+	STA&	!ENEMY_ARR
+	LDA	!SPEED
+	ADA#	1
+	STA&	!SPEED_ARR
 	POPX
 	POPA
 	FIN#	0
 	RTN
-S_SPEED_ARR:	.WORD	0
 S_ROW:	.WORD	0
 
 	; Displays ship at ports
@@ -555,38 +524,31 @@ KBD_DONE:	LDA#	INTERRUPT_ENA	; Re-enable KBD interrupts
 	POPA
 	IRTN
 
-; For timer and moving everything, we have to plan how things move
-; and how to decide what direction something moves in
-	; Need to decide on a timer count and have objects
-	; move every time count finishes (causing interrupt)
-	; Timer altered from pong code
-; TIMER stores the number of timer cycles
-; After each timer cycle, check if the timer has reached the minimum action delay
-; Make minimum action delay how long each cycle takes? (probably
-; If not, return
-; If so, check against each action and trigger when met number of cycles
+	; Timer ISR
 TIMER_ISR: 	PSHA
 	PSHX
 	PSH#	PROJECTILES
 	JSR 	MOVE_PROJ	; Move projectile(s)
 	ADS# 	1
 	LDX# 	0
-	INC+	TIMERS
-	LDA+	TIMERS
-	CMA	SPAWN_DELAY
+	INC	TIMERS
+	LDA	TIMERS
+	CMA#	SPAWN_DELAY
 	;JLT	BOMB_ACTION
 	JLT	T_SPEED1
 	LDA	NUM_ENEMIES
-	CMA#	12	; See if there is room for new enemies
+	CMA#	6	; See if there is room for new enemies
 	;JEQ	BOMB_ACTION
 	JEQ	T_SPEED1
 	CLR+	TIMERS
-	PSH#	5	; Get speed
+	PSH#	5	; Get speed (between 0 and 5)
 	JSR	RANDOM
 	ADS#	1
 	PSHA
+	PSH#	ENEMY_SHIPS
+	PSH#	ENEMY_SPDS
 	JSR	SPAWN
-	ADS#	1
+	ADS#	3
 	INC	NUM_ENEMIES
 ;BOMB_ACTION:	ADX#	1
 ;	INC+  TIMERS
@@ -595,59 +557,52 @@ TIMER_ISR: 	PSHA
 ;	JLT	ENEMY_ACTION
 ;	CLR+	TIMERS
 ;	JSR	MOVE_BOMBS
-T_SPEED1:	ADX#	1
+	; Add to speeds a certain number to make it like CHMOD
+	; one call of move based on the speed value passed
+T_SPEED1:	ADX#	1	; Speeds 1 and 4
 	INC+	TIMERS
 	LDA+	TIMERS
-	CMA	SPD1_DELAY
+	CMA#	SPD1_DELAY
 	JLT	T_SPEED2
 	CLR+	TIMERS
-	PSH#	SPEEDL1
-	PSH#	0
-	JSR	MOVE_ENEMY
-	ADS#	2
-	PSH#	SPEEDR1
-	PSH#	1
-	JSR	MOVE_ENEMY
-	ADS#	2
-T_SPEED2:	ADX#	1
+	INC	MV_SPEEDS
+T_SPEED2:	ADX#	1	; Speeds 2 and 5
 	INC+	TIMERS
 	LDA+	TIMERS
-	CMA	SPD2_DELAY
+	CMA#	SPD2_DELAY
 	JLT	T_SPEED3
 	CLR+	TIMERS
-	PSH#	SPEEDL2
-	PSH#	0
-	JSR	MOVE_ENEMY
-	ADS#	2
-	PSH#	SPEEDR2
-	PSH#	1
-	JSR	MOVE_ENEMY
-	ADS#	2
-T_SPEED3:	ADX#	1
+	LDA	MV_SPEEDS
+	ADA#	3
+	STA	MV_SPEEDS
+T_SPEED3:	ADX#	1	; Speeds 3 and 6
 	INC+	TIMERS
 	LDA+	TIMERS
-	CMA	SPD3_DELAY
+	CMA#	SPD3_DELAY
 	JLT	TIMER_DONE
 	CLR+	TIMERS
-	PSH#	SPEEDL3
-	PSH#	0
-	JSR	MOVE_ENEMY
-	ADS#	2
-	PSH#	SPEEDR3
-	PSH#	1
-	JSR	MOVE_ENEMY
-	ADS#	2
+	LDA	MV_SPEEDS
+	ADA#	5	; ACC holds the value for speeds
+ENEMY_ACTION:	CMA#	0
+;	JEQ	HIT_CHECKS  or whatever is next
+	JEQ	TIMER_DONE
+	PSHA
+	PSH#	ENEMY_SHIPS
+	PSH#	ENEMY_SPDS
+	JSR	MOVE_ENEMIES
+	ADS#	3
 ;	JLT	HIT_CHECKS
 ;	ADX#	1
 ;HIT_CHECKS:	JSR	CHECK_HITS	; Hit logic
-TIMER_DONE:	LDA#	ENABLE_AND_RESET
+TIMER_DONE:	CLR	MV_SPEEDS
+	LDA#	ENABLE_AND_RESET
           	OUTB	TIM_CNTL
 	POPX
           	POPA
           	IRTN		; END OF TIMER_ISR
-	; Timers in order of spawn, bombs, enemy ships
-TIMERS:	.BLKW	4, 0
-DELAY:	.WORD 1000	; Game base speed
+MV_SPEEDS:	.WORD	0
+	; Timers in order of spawn, bombs, speeds (3)
+TIMERS:	.BLKW	8, 0
 
 	; Interrupt Vector
 	.EQU @, $FF8
