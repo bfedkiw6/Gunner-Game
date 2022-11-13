@@ -221,7 +221,7 @@ MOVE_ENEMY:	BGN# 	0
 	PSHX
 	LDA#	0	; Reset Index
 	STA	M_INDEX
-CLR_ENEMIES:	PSH#	!M_ENEMIES
+CLR_ENEMIES:	PSH	!M_ENEMIES
 	PSH	M_INDEX
 	PSH#	0	
 	JSR	CLEAR_ENEMY	; Clear current ships
@@ -229,10 +229,10 @@ CLR_ENEMIES:	PSH#	!M_ENEMIES
 	INC	M_INDEX
 	LDA	M_INDEX
 	CMA#	12
-	JNE	CLR_ENEMIES	
-	LDX#	0
+	JNE	CLR_ENEMIES
 	LDA	!DIRECTION
-	CMA#	1
+	CMA#	1	
+	LDX#	0
 	JEQ	MOVE_RIGHT	; If direction = 1, move ships right
 MOVE_LEFT:	LDA&	!M_ENEMIES	; Shift ships to the left
 	CMA#	0	; See if it is a valid port
@@ -284,6 +284,35 @@ CURR_PORT:	.WORD	0
 DISPLAY_ENEMY:	BGN#	0
 	PSHA	
 	PSHX
+	LDA	!D_ENMY_PORT
+	STA	TEMP_PORT_R
+	STA	TEMP_PORT_L
+	; Looking at right of ship
+	LDA	TEMP_PORT_R
+	ADA#	2	
+	SBA#	$100	; See if left & middle of ship it is out of screen on left
+	MOD#	38
+	CMA#	0	
+	JEQ	PRINT_R
+	LDA	TEMP_PORT_R
+	ADA#	1	
+	SBA#	$100	; See if left of ship is out of screen on left
+	MOD#	38
+	CMA#	0
+	JEQ	PRINT_MID_R
+	; Looking at left of ship
+	LDA	TEMP_PORT_L	
+	SBA#	$125	; See if right & middle of ship is out of screen on right
+	MOD#	38
+	CMA#	0	
+	JEQ	PRINT_L
+	LDA	TEMP_PORT_L
+	ADA#	1	
+	SBA#	$125	; See if right of ship is out of screen on right
+	MOD#	38
+	CMA#	0	
+	JEQ	PRINT_MID_L
+	; Print all characters, nothing offscreen
 	LDX# 	1
 	LDA#	'o'
 	OUTB& !D_ENMY_PORT
@@ -291,10 +320,34 @@ DISPLAY_ENEMY:	BGN#	0
 	OUTB*	!D_ENMY_PORT
 	ADX#	1		
 	OUTB&	!D_ENMY_PORT
-	POPX
+	JMP	STOP_PRINT
+PRINT_R:	LDX#	2
+	LDA#	'|'			
+	OUTB&	!D_ENMY_PORT
+	JMP	STOP_PRINT
+PRINT_L:	LDX# 	1
+	LDA#	'|'	
+	OUTB*	!D_ENMY_PORT
+	JMP	STOP_PRINT
+PRINT_MID_R:	LDX# 	1
+	LDA#	'o'
+	OUTB& !D_ENMY_PORT
+	LDA#	'|'	
+	ADX#	1		
+	OUTB&	!D_ENMY_PORT
+	JMP	STOP_PRINT
+PRINT_MID_L:	LDX# 	1
+	LDA#	'o'
+	OUTB& !D_ENMY_PORT
+	LDA#	'|'	
+	OUTB*	!D_ENMY_PORT
+	JMP	STOP_PRINT
+STOP_PRINT:	POPX
 	POPA
 	FIN# 	0
 	RTN
+TEMP_PORT_L:	.WORD	0
+TEMP_PORT_R:	.WORD	0
 
 	; Clear enemy ship from screen (also possibly from array)
 	.EQU	C_ENEMIES, 4
@@ -533,6 +586,7 @@ TIMER_ISR: 	PSHA
 	ADS#	1
 	PSHA
 	JSR	SPAWN
+	ADS#	1
 ;BOMB_ACTION:	ADX#	1
 ;	INC+  TIMERS
 ;          	LDA+	TIMERS
