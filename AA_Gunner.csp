@@ -57,20 +57,6 @@ SETUP:	LDS# 	$E00
 	; Let the user have maybe 5 seconds before ships start spawning in
 MAIN:	JSR	START_GAME
 	ADS#	1
-
-; Attempt to test move ship - not currently working
-;	PSH#	$172
-;	JSR	DISPLAY_ENMY
-;	ADS#	1
-;RAND_LOOP:	INC 	COUNTER
-;	PSH#	SPEED1
-;	PSH#	1
-;	JSR	MOVE_ENMY
-;	ADS#	2
-;	LDA	COUNTER
-;	CMA#	38
-;	JNE	RAND_LOOP
-;COUNTER:	.WORD	0
 	
 LOOP:	NOP
 	JMP	LOOP
@@ -233,6 +219,8 @@ C_CURR_PORT:	.WORD	0
 MOVE_ENEMY:	BGN# 	0
 	PSHA
 	PSHX
+	LDA#	0	; Reset Index
+	STA	M_INDEX
 CLR_ENEMIES:	PSH#	!M_ENEMIES
 	PSH	M_INDEX
 	PSH#	0	
@@ -247,26 +235,32 @@ CLR_ENEMIES:	PSH#	!M_ENEMIES
 	CMA#	1
 	JEQ	MOVE_RIGHT	; If direction = 1, move ships right
 MOVE_LEFT:	LDA&	!M_ENEMIES	; Shift ships to the left
+	CMA#	0	; See if it is a valid port
+	JEQ	CHECK_INDX1	
 	SBA#	1
 	STA	CURR_PORT
 	SBA#	$100	; See if it is out of screen on left
 	MOD#	38
 	CMA#	0	
-	JEQ	RESET1		
-	STA&	CURR_PORT	; Not out of screen, save new loation
+	JEQ	RESET1
+	LDA	CURR_PORT		
+	STA&	!M_ENEMIES	; Not out of screen, save new location
 	JMP	CHECK_INDX1	
 RESET1:	CLR&	!M_ENEMIES	; If proj goes out of screen, clear in array
 CHECK_INDX1:	AOC#	12
 	JLT	MOVE_LEFT
 	JMP	NEW_DISPLAY			
 MOVE_RIGHT:	LDA&	!M_ENEMIES	; Shift ships to the right
+	CMA#	0	; See if it is a valid port
+	JEQ	CHECK_INDX2
 	ADA#	1
 	STA	CURR_PORT
 	SBA#	$125	; See if it is out of screen on right
 	MOD#	38
 	CMA#	0	
 	JEQ	RESET2		
-	STA&	CURR_PORT	; Not out of screen, save new loation
+	LDA	CURR_PORT		
+	STA&	!M_ENEMIES	; Not out of screen, save new loation
 	JMP	CHECK_INDX2	
 RESET2:	CLR&	!M_ENEMIES	; If proj goes out of screen, clear in array
 CHECK_INDX2:	AOC#	12
@@ -552,12 +546,12 @@ T_SPEED1:	ADX#	1
 	CMA	SPD1_DELAY
 	JLT	T_SPEED2
 	CLR+	TIMERS
-	PSH#	0
 	PSH#	SPEEDL1
+	PSH#	0
 	JSR	MOVE_ENEMY
 	ADS#	2
-	PSH#	1
 	PSH#	SPEEDR1
+	PSH#	1
 	JSR	MOVE_ENEMY
 	ADS#	2
 T_SPEED2:	ADX#	1
@@ -566,12 +560,12 @@ T_SPEED2:	ADX#	1
 	CMA	SPD2_DELAY
 	JLT	T_SPEED3
 	CLR+	TIMERS
-	PSH#	0
 	PSH#	SPEEDL2
+	PSH#	0
 	JSR	MOVE_ENEMY
 	ADS#	2
-	PSH#	1
 	PSH#	SPEEDR2
+	PSH#	1
 	JSR	MOVE_ENEMY
 	ADS#	2
 T_SPEED3:	ADX#	1
@@ -580,12 +574,12 @@ T_SPEED3:	ADX#	1
 	CMA	SPD3_DELAY
 	JLT	TIMER_DONE
 	CLR+	TIMERS
-	PSH#	0
 	PSH#	SPEEDL3
+	PSH#	0
 	JSR	MOVE_ENEMY
 	ADS#	2
-	PSH#	1
 	PSH#	SPEEDR3
+	PSH#	1
 	JSR	MOVE_ENEMY
 	ADS#	2
 ;	JLT	HIT_CHECKS
