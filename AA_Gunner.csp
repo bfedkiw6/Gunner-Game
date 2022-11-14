@@ -66,6 +66,7 @@ SHIP_R1:	.WORD $100 + (11 * CRT_COLS) + (CRT_COLS/2) - 1
 SHIP_R2:	.WORD $100 + (12*CRT_COLS) + (CRT_COLS/2) - 2
 PROJECTILES:	.BLKW	10, 0
 SHIP_HEALTH:	.WORD 5
+CURR_LEVEL:	.WORD	$30
 NUM_ENEMIES:	.WORD	0
 SPEEDR1:	.BLKW	12, 0
 SPEEDR2:	.BLKW	12, 0
@@ -122,6 +123,62 @@ SCORE_STR2:	.WORD	're:'
 LEVEL_STR:	.WORD	'Lev'	; Can shorten to lvl if need space for score
 LEVEL_STR2:	.WORD	'el:'
 
+	; Display on Screen the start of level
+START_LVL:	BGN# 	0
+	PSHA
+	PSHX
+PRINT_SLVL:	LDC	LVL_S_STR
+	ADX#	$CD
+	OUTB+	CRT_VBUF
+	SBX#	$CD
+	AOC#	6	
+	JNE	PRINT_SLVL	
+	ADX#	$CD
+	LDA	CURR_LEVEL
+	OUTB+	CRT_VBUF
+	POPX
+	POPA
+	FIN# 	0
+	RTN
+LVL_S_STR:	.WORD	'Lev'	
+LVL_S_STR2:	.WORD	'el '
+
+	; Display on Screen the beating level
+BEAT_LVL:	BGN# 	0
+	PSHA
+	PSHX
+PRINT_BLVL:	LDC	LVL_B_STR
+	ADX#	$C9
+	OUTB+	CRT_VBUF
+	SBX#	$C9
+	AOC#	15	
+	JNE	PRINT_BLVL	
+	POPX
+	POPA
+	FIN# 	0
+	RTN
+LVL_B_STR:	.WORD	'Lev'	
+LVL_B_STR2:	.WORD	'el '
+LVL_B_STR3:	.WORD	'Com'
+LVL_B_STR4:	.WORD	'ple'
+LVL_B_STR5:	.WORD	'te!'
+
+	; Clear start/beat level from screen
+	.EQU	SIZE_WORDS, 2
+CLR_DISPLAY:	BGN# 	0
+	PSHA
+	PSHX
+CLR_DISP:	LDA#	' '
+	ADX#	$CD
+	OUTB+	CRT_VBUF
+	SBX#	$CD
+	AOC	!SIZE_WORDS	
+	JNE	CLR_DISP	
+	POPX
+	POPA
+	FIN# 	0
+	RTN
+	
 	; Shoot subroutine shoots if no projectile in row above ship
 	.EQU	S_PROJ, 3
 	.EQU	S_SHIP_R1, 2
@@ -176,7 +233,7 @@ MOVING:	LDA&	!M_PROJ	; Shift projectiles up a row
 ;CLEAR_PE:	CLR&	!M_PROJ	
 	;PSH	!MP_ENEMIES
 	;PSH	PROJ_PORT
-	;PSH#	12
+	;PSH#	7
 	;JSR	CLEAR_ARRAY
 	;ADS#	3
 	;JMP	CHECK_INDEX
@@ -628,7 +685,22 @@ TIMER_ISR: 	PSHA
 	;PSH#	SPEEDL1
 	JSR 	MOVE_PROJ	; Move projectile(s)
 	ADS# 	1
+
 	LDX# 	0
+
+; TRYING TO ADD START AND BEAT LEVEL DISPLAY
+	;INC	CURR_LEVEL
+;DISPLAY_START:	INC+	TIMERS
+	;LDA+	TIMERS
+	;JSR	START_LVL
+	;CMA#	STARTLVL_DELAY
+	;JNE	DISPLAY_START
+	;PSH#	7
+	;JSR	CLR_DISPLAY
+	;ADS# 1
+	;CLR+	TIMERS
+
+	;ADX#	1
 	INC+	TIMERS
 	LDA+	TIMERS
 	CMA	SPAWN_DELAY
