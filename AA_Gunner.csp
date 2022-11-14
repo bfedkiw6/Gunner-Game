@@ -175,11 +175,12 @@ MOVING:	LDA&	!M_PROJ	; Shift projectiles up a row
 	;JMP	CHECK_INDEX	; No hit, continue moving projectiles
 ;CLEAR_PE:	CLR&	!M_PROJ	
 	;PSH	!MP_ENEMIES
-	;PSH#	1
-	;JSR	CLEAR_ENEMY
-	;ADS#	2
+	;PSH	PROJ_PORT
+	;PSH#	12
+	;JSR	CLEAR_ARRAY
+	;ADS#	3
 	;JMP	CHECK_INDEX
-	; Not out of screen & did not hit enemy ship, save new loation	
+	; Not out of screen & did not hit enemy ship, save new location	
 	STA&	!M_PROJ	
 	JMP	CHECK_INDEX	
 RESET:	CLR&	!M_PROJ	; If proj goes out of screen, clear in array
@@ -218,7 +219,7 @@ CLEAR_PROJ:	BGN#	0
 	PSHA
 	PSHX
 	LDX#	0
-CP_LOOP:	LDA&	!C_PROJ
+CP_LOOP:	LDA&	!C_PROJ	
 	STA	C_CURR_PORT
 	LDA#	' '
 	OUTB*	C_CURR_PORT
@@ -230,6 +231,26 @@ CP_LOOP:	LDA&	!C_PROJ
 	RTN
 C_CURR_PORT:	.WORD	0
 
+	; Clear a value from an array given a value
+	.EQU	ARRAY, 4
+	.EQU	PORT, 3
+	.EQU	SIZE, 2
+CLEAR_ARRAY:	BGN#	0
+	PSHA
+	PSHX
+	LDX#	0
+ARRAY_LOOP:	LDA&	!ARRAY	; Look for where port exists in array
+	CMA	!PORT
+	JNE	ARRAY_CHECK
+	LDA#	0	; Port exists in array, clear it
+	STA&	!ARRAY
+ARRAY_CHECK:	AOC	!SIZE
+	JLT	ARRAY_LOOP
+	POPX
+	POPA
+	FIN# 	0
+	RTN
+
 	; Move enemy ships
 	.EQU	M_ENEMIES, 4
 	.EQU	MP_PROJ, 3
@@ -238,10 +259,9 @@ MOVE_ENEMY:	BGN# 	0
 	PSHA
 	PSHX
 	LDX#	0	; Reset Index
-CLR_ENEMIES:	PSH	!M_ENEMIES
-	PSH#	0	
+CLR_ENEMIES:	PSH	!M_ENEMIES	
 	JSR	CLEAR_ENEMY	; Clear current ships
-	ADS#	2
+	ADS#	1
 	AOC#	12
 	JNE	CLR_ENEMIES
 	LDA	!DIRECTION
@@ -262,11 +282,12 @@ MOVE_LEFT:	LDA&	!M_ENEMIES	; Shift ships to the left
 	INB*	CURR_PORT
 	CMA#	PROJ_CHAR
 	JNE	SET_ENEMY1
-	CLR&	!MP_PROJ	
-	PSH	!M_ENEMIES
-	PSH#	1
-	JSR	CLEAR_ENEMY
-	ADS#	2
+	CLR&	!M_ENEMIES	
+	PSH	!MP_PROJ
+	PSH	CURR_PORT
+	PSH#	10
+	JSR	CLEAR_ARRAY
+	ADS#	3
 	JMP	CHECK_INDX1
 	; Not out of screen, save new location
 SET_ENEMY1:	LDA	CURR_PORT		
@@ -289,12 +310,13 @@ MOVE_RIGHT:	LDA&	!M_ENEMIES	; Shift ships to the right
 	; See if it is hit by a projectile	
 	INB*	CURR_PORT
 	CMA#	PROJ_CHAR
-	JNE	SET_ENEMY2
-	CLR&	!MP_PROJ	
-	PSH	!M_ENEMIES
-	PSH#	1
-	JSR	CLEAR_ENEMY
-	ADS#	2
+	JNE	SET_ENEMY1
+	CLR&	!M_ENEMIES	
+	PSH	!MP_PROJ
+	PSH	CURR_PORT
+	PSH#	10
+	JSR	CLEAR_ARRAY
+	ADS#	3
 	JMP	CHECK_INDX2
 	; Not out of screen, save new location
 SET_ENEMY2:	LDA	CURR_PORT		
@@ -391,9 +413,8 @@ STOP_PRINT:	POPX
 TEMP_PORT_L:	.WORD	0
 TEMP_PORT_R:	.WORD	0
 
-	; Clear enemy ship from screen (also possibly from array)
-	.EQU	C_ENEMIES, 3
-	.EQU	HIT, 2
+	; Clear enemy ship from screen 
+	.EQU	C_ENEMIES, 2
 CLEAR_ENEMY:	BGN#	0
 	PSHA
 	PSHX
@@ -405,13 +426,7 @@ CLEAR_ENEMY:	BGN#	0
 CLEAR_ALL:	OUTB&	C_ENMY_PORT
 	AOC#	3
 	JLT	CLEAR_ALL
-	LDA	!HIT	; See if ship was hit and needs to be cleared from array
-	CMA#	1
-	JNE	EXIT_CLEAR
-	LDX	C_INDEX
-	LDA#	0
-	STA&	!C_ENEMIES
-EXIT_CLEAR:	POPX
+	POPX
 	POPA
 	FIN# 	0
 	RTN
