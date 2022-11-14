@@ -112,7 +112,7 @@ PRINT_PT2:	LDA# '0'
 	LDX#  GROUND	; Set ground to start on last row
 PRINT_GROUND:	OUTB+	0	; Output across whole row
 	AOC# 	CRT_END
-	JLE   PRINT_GROUND
+	JLE   PRINT_GROUND	
 	POPA
 	POPX
 	FIN#  0
@@ -153,6 +153,7 @@ S_PORT:	.WORD	0
 
 	; Get new position for each projectile
 	.EQU	M_PROJ, 2
+	;.EQU	MP_ENEMIES, 2
 MOVE_PROJ:	BGN# 	0
 	PSHA
 	PSHX
@@ -162,9 +163,24 @@ MOVE_PROJ:	BGN# 	0
 	LDX#	0
 MOVING:	LDA&	!M_PROJ	; Shift projectiles up a row
 	SBA#	38
+	STA	PROJ_PORT
 	CMA#	$126	; See if it is out playing field
-	JLT	RESET		
-	STA&	!M_PROJ	; Not out of screen, save new loation
+	JLT	RESET
+	; Check if projectile hits an enemy ship
+	;INB*	PROJ_PORT
+	;CMA#	'|'
+	;JEQ	CLEAR_PE	; There is a hit
+	;CMA#	'o'
+	;JEQ	CLEAR_PE	; There is a hit
+	;JMP	CHECK_INDEX	; No hit, continue moving projectiles
+;CLEAR_PE:	CLR&	!M_PROJ	
+	;PSH	!MP_ENEMIES
+	;PSH#	1
+	;JSR	CLEAR_ENEMY
+	;ADS#	2
+	;JMP	CHECK_INDEX
+	; Not out of screen & did not hit enemy ship, save new loation	
+	STA&	!M_PROJ	
 	JMP	CHECK_INDEX	
 RESET:	CLR&	!M_PROJ	; If proj goes out of screen, clear in array
 CHECK_INDEX:	AOC#	10
@@ -176,6 +192,7 @@ CHECK_INDEX:	AOC#	10
 	POPA
 	FIN#	0 	
 	RTN
+PROJ_PORT:	.WORD	0
 
 	; Display projectiles
 	.EQU	D_PROJ, 2
@@ -214,21 +231,18 @@ CP_LOOP:	LDA&	!C_PROJ
 C_CURR_PORT:	.WORD	0
 
 	; Move enemy ships
-	.EQU	M_ENEMIES, 3
+	.EQU	M_ENEMIES, 4
+	.EQU	MP_PROJ, 3
 	.EQU	DIRECTION, 2
 MOVE_ENEMY:	BGN# 	0
 	PSHA
 	PSHX
-	LDA#	0	; Reset Index
-	STA	M_INDEX
+	LDX#	0	; Reset Index
 CLR_ENEMIES:	PSH	!M_ENEMIES
-	PSH	M_INDEX
 	PSH#	0	
 	JSR	CLEAR_ENEMY	; Clear current ships
-	ADS#	3
-	INC	M_INDEX
-	LDA	M_INDEX
-	CMA#	12
+	ADS#	2
+	AOC#	12
 	JNE	CLR_ENEMIES
 	LDA	!DIRECTION
 	CMA#	1	
@@ -239,12 +253,24 @@ MOVE_LEFT:	LDA&	!M_ENEMIES	; Shift ships to the left
 	JEQ	CHECK_INDX1	
 	SBA#	1
 	STA	CURR_PORT
-	SBA#	$100	; See if it is out of screen on left
+	; See if it is out of screen on left
+	SBA#	$100	
 	MOD#	38
 	CMA#	0	
 	JEQ	RESET1
-	LDA	CURR_PORT		
-	STA&	!M_ENEMIES	; Not out of screen, save new location
+	; See if it is hit by a projectile	
+	INB*	CURR_PORT
+	CMA#	PROJ_CHAR
+	JNE	SET_ENEMY1
+	CLR&	!MP_PROJ	
+	PSH	!M_ENEMIES
+	PSH#	1
+	JSR	CLEAR_ENEMY
+	ADS#	2
+	JMP	CHECK_INDX1
+	; Not out of screen, save new location
+SET_ENEMY1:	LDA	CURR_PORT		
+	STA&	!M_ENEMIES	
 	JMP	CHECK_INDX1	
 RESET1:	CLR&	!M_ENEMIES	; If proj goes out of screen, clear in array
 CHECK_INDX1:	AOC#	12
@@ -255,12 +281,24 @@ MOVE_RIGHT:	LDA&	!M_ENEMIES	; Shift ships to the right
 	JEQ	CHECK_INDX2
 	ADA#	1
 	STA	CURR_PORT
-	SBA#	$125	; See if it is out of screen on right
+	; See if it is out of screen on right
+	SBA#	$125	
 	MOD#	38
 	CMA#	0	
 	JEQ	RESET2		
-	LDA	CURR_PORT		
-	STA&	!M_ENEMIES	; Not out of screen, save new loation
+	; See if it is hit by a projectile	
+	INB*	CURR_PORT
+	CMA#	PROJ_CHAR
+	JNE	SET_ENEMY2
+	CLR&	!MP_PROJ	
+	PSH	!M_ENEMIES
+	PSH#	1
+	JSR	CLEAR_ENEMY
+	ADS#	2
+	JMP	CHECK_INDX2
+	; Not out of screen, save new location
+SET_ENEMY2:	LDA	CURR_PORT		
+	STA&	!M_ENEMIES	
 	JMP	CHECK_INDX2	
 RESET2:	CLR&	!M_ENEMIES	; If proj goes out of screen, clear in array
 CHECK_INDX2:	AOC#	12
@@ -276,7 +314,6 @@ DISPLAY_ALL:	LDA&	!M_ENEMIES
 	POPA
 	FIN#	0 	
 	RTN
-M_INDEX:	.WORD	0
 M_ENMY_PORT:	.WORD	0
 CURR_PORT:	.WORD	0
 
@@ -355,13 +392,12 @@ TEMP_PORT_L:	.WORD	0
 TEMP_PORT_R:	.WORD	0
 
 	; Clear enemy ship from screen (also possibly from array)
-	.EQU	C_ENEMIES, 4
-	.EQU	C_INDEX, 3
+	.EQU	C_ENEMIES, 3
 	.EQU	HIT, 2
 CLEAR_ENEMY:	BGN#	0
 	PSHA
 	PSHX
-	LDX	!C_INDEX
+	STX	C_INDEX
 	LDA&	!C_ENEMIES
 	STA	C_ENMY_PORT
 	LDX#	0
@@ -372,7 +408,7 @@ CLEAR_ALL:	OUTB&	C_ENMY_PORT
 	LDA	!HIT	; See if ship was hit and needs to be cleared from array
 	CMA#	1
 	JNE	EXIT_CLEAR
-	LDX	!C_INDEX
+	LDX	C_INDEX
 	LDA#	0
 	STA&	!C_ENEMIES
 EXIT_CLEAR:	POPX
@@ -380,6 +416,7 @@ EXIT_CLEAR:	POPX
 	FIN# 	0
 	RTN
 C_ENMY_PORT:	.WORD	0
+C_INDEX:	.WORD	0
 
 	; Spawns an enemy ship
 	.EQU SPEED, 2
@@ -573,6 +610,7 @@ KBD_DONE:	LDA#	INTERRUPT_ENA	; Re-enable KBD interrupts
 TIMER_ISR: 	PSHA
 	PSHX
 	PSH#	PROJECTILES
+	;PSH#	SPEEDL1
 	JSR 	MOVE_PROJ	; Move projectile(s)
 	ADS# 	1
 	LDX# 	0
@@ -607,13 +645,15 @@ T_SPEED1:	ADX#	1
 	JLT	T_SPEED2
 	CLR+	TIMERS
 	PSH#	SPEEDL1
+	PSH#	PROJECTILES
 	PSH#	0
 	JSR	MOVE_ENEMY
-	ADS#	2
+	ADS#	3
 	PSH#	SPEEDR1
+	PSH#	PROJECTILES
 	PSH#	1
 	JSR	MOVE_ENEMY
-	ADS#	2
+	ADS#	3
 T_SPEED2:	ADX#	1
 	INC+	TIMERS
 	LDA+	TIMERS
@@ -621,13 +661,15 @@ T_SPEED2:	ADX#	1
 	JLT	T_SPEED3
 	CLR+	TIMERS
 	PSH#	SPEEDL2
+	PSH#	PROJECTILES
 	PSH#	0
 	JSR	MOVE_ENEMY
-	ADS#	2
+	ADS#	3
 	PSH#	SPEEDR2
+	PSH#	PROJECTILES
 	PSH#	1
 	JSR	MOVE_ENEMY
-	ADS#	2
+	ADS#	3
 T_SPEED3:	ADX#	1
 	INC+	TIMERS
 	LDA+	TIMERS
@@ -635,13 +677,15 @@ T_SPEED3:	ADX#	1
 	JLT	TIMER_DONE
 	CLR+	TIMERS
 	PSH#	SPEEDL3
+	PSH#	PROJECTILES
 	PSH#	0
 	JSR	MOVE_ENEMY
-	ADS#	2
+	ADS#	3
 	PSH#	SPEEDR3
+	PSH#	PROJECTILES
 	PSH#	1
 	JSR	MOVE_ENEMY
-	ADS#	2
+	ADS#	3
 ;	JLT	HIT_CHECKS
 ;	ADX#	1
 ;HIT_CHECKS:	JSR	CHECK_HITS	; Hit logic
