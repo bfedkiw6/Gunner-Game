@@ -37,12 +37,11 @@
 	; Delay for enemy aircraft that changes based on time so need a word
 	.EQU 	STARTLVL_DELAY, 8	; # of timer iters displaying level
 	.EQU	BEATLVL_DELAY, 10	; # of timer iters displaying cleared msg
-	.EQU	PROJ_DELAY, 1 	; # of timer iters before projectiles move
-	.EQU 	BOMB_DELAY, 5	; # of timer iters before dropped bombs move
-	.EQU 	SPAWN_DELAY, $10	; # of iters before enemy ships spawn
-	.EQU	SPD1_DELAY, $30	; # of iters before ships move w/ different speeds
-	.EQU	SPD2_DELAY, $20
-	.EQU	SPD3_DELAY, $10
+	.EQU 	BOMB_DELAY, 3	; # of timer iters before dropped bombs move
+	.EQU 	SPAWN_DELAY, 5	; # of iters before enemy ships spawn
+	.EQU	SPD1_DELAY, 3	; # of iters before ships move w/ different speeds
+	.EQU	SPD2_DELAY, 2
+	; Speed 3 moves every clock cycle
 
 SETUP:	LDS# 	$E00
 	; Keyboard setup
@@ -50,20 +49,19 @@ SETUP:	LDS# 	$E00
 	OUTB	KBD_CNTL
 	; Timer setup
 	LDA	DELAY
-	OUTW  TIM_VALUE		
+	OUTW  TIM_VALUE
 	LDA#	ENABLE_RESET_AND_START
-	OUTB 	TIM_CNTL  
+	OUTB 	TIM_CNTL
 	SIE
 	; Load initial stage
 	; Probably just the ground, ship, score, level
 	; Let the user have maybe 5 seconds before ships start spawning in
 MAIN:	JSR	START_GAME
-	ADS#	1
-	
 LOOP:	NOP
 	JMP	LOOP
 	HLT
-; Stores the ports for ^ and the left | of the ship/AA gun
+DELAY:	.WORD 2600	; Game base speed
+	; Stores the ports for ^ and the left | of the ship/AA gun
 SHIP_R1:	.WORD $100 + (11 * CRT_COLS) + (CRT_COLS/2) - 1
 SHIP_R2:	.WORD $100 + (12*CRT_COLS) + (CRT_COLS/2) - 2
 PROJECTILES:	.BLKW	10, 0
@@ -71,12 +69,8 @@ SHIP_HEALTH:	.WORD 5
 CURR_LEVEL:	.WORD	$30
 CURR_SCORE:	.WORD	0
 NUM_ENEMIES:	.WORD	0
-SPEEDR1:	.BLKW	12, 0
-SPEEDR2:	.BLKW	12, 0
-SPEEDR3:	.BLKW	12, 0
-SPEEDL1:	.BLKW	12, 0
-SPEEDL2:	.BLKW	12, 0
-SPEEDL3:	.BLKW	12, 0
+ENEMY_SHIPS:	.BLKW	7, 0
+ENEMY_SPDS:	.BLKW	7, 0
 
 	; Subroutines
 	.EQU	@, $100
@@ -84,33 +78,33 @@ SPEEDL3:	.BLKW	12, 0
 	; Initializes graphics and starts game
 START_GAME:	BGN#  0
 	PSHA
-	PSHX 
+	PSHX
 	; Print Score
 	LDX#	0
-PRINT_SCORE:	LDC	SCORE_STR
+PRINT_SCORE:	LDC	SCORE_STR	; Print "Score:"
 	OUTB+	CRT_VBUF
-	AOC#	6	; Check if all characters are printed
+	AOC#	6
 	JNE	PRINT_SCORE
 	LDA# '0'
-SCORE_PT2:	OUTB+ CRT_VBUF
+SCORE_PT2:	OUTB+ CRT_VBUF	; Print numbers for the score
 	AOC# 16
 	JLT SCORE_PT2
 	; Print level
-	LDX#  0	
-PRINT_LEVEL:	LDC	LEVEL_STR
+	LDX#  0
+PRINT_LEVEL:	LDC	LEVEL_STR	; Print "Level:"
 	; To not overwrite Score, shift over XR (leave room for the level #)
 	ADX#	30
 	OUTB+	CRT_VBUF
 	; Return back to original XR so next character can be gotten
 	SBX#	30
-	AOC#	6	; Check if all characters are printed
-	JNE	PRINT_LEVEL
+	AOC#	6
+	JNE	PRINT_LEVEL	; Print numbers for level
 PRINT_PT2:	LDA# '0'
 	OUTB	LEVEL
 	LDA# '1'
 	OUTB	LEVEL + 1
 	; Build the Turret
-	JSR 	DISPLAY_SHIP		
+	JSR 	DISPLAY_SHIP
 	; Print the ground
 	LDA#  GROUND_CHAR	; Load up ground character
 	LDX#  GROUND	; Set ground to start on last row
@@ -120,7 +114,7 @@ PRINT_GROUND:	OUTB+	0	; Output across whole row
 	POPA
 	POPX
 	FIN#  0
-	RTN          
+	RTN
 SCORE_STR:	.WORD	'Sco'
 SCORE_STR2:	.WORD	're:'
 LEVEL_STR:	.WORD	'Lev'	; Can shorten to lvl if need space for score
@@ -134,8 +128,8 @@ PRINT_SLVL:	LDC	LVL_S_STR
 	ADX#	$CD
 	OUTB+	CRT_VBUF
 	SBX#	$CD
-	AOC#	6	
-	JNE	PRINT_SLVL	
+	AOC#	6
+	JNE	PRINT_SLVL
 	ADX#	$CD
 	LDA	CURR_LEVEL
 	OUTB+	CRT_VBUF
@@ -143,7 +137,7 @@ PRINT_SLVL:	LDC	LVL_S_STR
 	POPA
 	FIN# 	0
 	RTN
-LVL_S_STR:	.WORD	'Lev'	
+LVL_S_STR:	.WORD	'Lev'
 LVL_S_STR2:	.WORD	'el '
 
 	; Display on Screen beating level
@@ -154,13 +148,13 @@ PRINT_BLVL:	LDC	LVL_B_STR
 	ADX#	$C9
 	OUTB+	CRT_VBUF
 	SBX#	$C9
-	AOC#	15	
-	JNE	PRINT_BLVL	
+	AOC#	15
+	JNE	PRINT_BLVL
 	POPX
 	POPA
 	FIN# 	0
 	RTN
-LVL_B_STR:	.WORD	'Lev'	
+LVL_B_STR:	.WORD	'Lev'
 LVL_B_STR2:	.WORD	'el '
 LVL_B_STR3:	.WORD	'Com'
 LVL_B_STR4:	.WORD	'ple'
@@ -175,13 +169,13 @@ CLR_DISP:	LDA#	' '
 	ADX#	$CD
 	OUTB+	CRT_VBUF
 	SBX#	$CD
-	AOC	!SIZE_WORDS	
-	JNE	CLR_DISP	
+	AOC	!SIZE_WORDS
+	JNE	CLR_DISP
 	POPX
 	POPA
 	FIN# 	0
 	RTN
-	
+
 	; Shoot subroutine shoots if no projectile in row above ship
 	.EQU	S_PROJ, 3
 	.EQU	S_SHIP_R1, 2
@@ -194,9 +188,9 @@ CHECK_PROJ:	LDA&	!S_PROJ
 	JEQ	ADD_PROJ	; If space not filled, add projectile
 	; Check if port is in row above ship
 CHECK_ABOVE:	CMA#	$100 + (10 * CRT_COLS)
-	JGE	DONE	; No space for new projectile	
+	JGE	DONE	; No space for new projectile
 SUB_JUMP:	SOJ	CHECK_PROJ	; Port is in row above ship, check next element
-	; Open space above ship	
+	; Open space above ship
 ADD_PROJ:	LDA	!S_SHIP_R1
 	SBA#	38
 	STA&	!S_PROJ
@@ -217,7 +211,7 @@ S_PORT:	.WORD	0
 MOVE_PROJ:	BGN# 	0
 	PSHA
 	PSHX
-	PSH	!M_PROJ	
+	PSH	!M_PROJ
 	JSR	CLEAR_PROJ	; Clear current projectiles
 	ADS#	1
 	LDX#	0
@@ -233,32 +227,32 @@ MOVING:	LDA&	!M_PROJ	; Shift projectiles up a row
 	;CMA#	'o'
 	;JEQ	CLEAR_PE	; There is a hit
 	;JMP	CHECK_INDEX	; No hit, continue moving projectiles
-;CLEAR_PE:	CLR&	!M_PROJ	
+;CLEAR_PE:	CLR&	!M_PROJ
 	;PSH	!MP_ENEMIES
 	;PSH	PROJ_PORT
 	;PSH#	7
 	;JSR	CLEAR_ARRAY
 	;ADS#	3
 	;JMP	CHECK_INDEX
-	; Not out of screen & did not hit enemy ship, save new location	
-	STA&	!M_PROJ	
-	JMP	CHECK_INDEX	
+	; Not out of screen & did not hit enemy ship, save new location
+	STA&	!M_PROJ
+	JMP	CHECK_INDEX
 RESET:	CLR&	!M_PROJ	; If proj goes out of screen, clear in array
 CHECK_INDEX:	AOC#	10
 	JLT	MOVING
 	PSH	!M_PROJ
 	JSR	DISPLAY_PROJ	; Redisplay projectiles at new ports
 	ADS#	1
-	POPX	
+	POPX
 	POPA
-	FIN#	0 	
+	FIN#	0
 	RTN
 PROJ_PORT:	.WORD	0
 
 	; Display projectiles
 	.EQU	D_PROJ, 2
 DISPLAY_PROJ:	BGN#	0
-	PSHA	
+	PSHA
 	PSHX
 	LDX#	0
 DP_LOOP:	LDA&	!D_PROJ
@@ -279,7 +273,7 @@ CLEAR_PROJ:	BGN#	0
 	PSHA
 	PSHX
 	LDX#	0
-CP_LOOP:	LDA&	!C_PROJ	
+CP_LOOP:	LDA&	!C_PROJ
 	STA	C_CURR_PORT
 	LDA#	' '
 	OUTB*	C_CURR_PORT
@@ -342,245 +336,210 @@ FINISH_SCORE:	POPX
 	RTN
 
 	; Move enemy ships
+	.EQU	M_MV_SPEEDS, 5	; 2 bits to represent each speed
 	.EQU	M_ENEMIES, 4
-	.EQU	MP_PROJ, 3
-	.EQU	DIRECTION, 2
-MOVE_ENEMY:	BGN# 	0
+	.EQU	M_SPEEDS, 3
+	.EQU	M_PROJECTILES, 2
+MOVE_ENEMIES:	BGN# 	0
 	PSHA
 	PSHX
-	LDX#	0	; Reset Index
-CLR_ENEMIES:	PSH	!M_ENEMIES	
-	JSR	CLEAR_ENEMY	; Clear current ships
-	ADS#	1
-	AOC#	12
-	JNE	CLR_ENEMIES
-	LDA	!DIRECTION
-	CMA#	1	
 	LDX#	0
-	JEQ	MOVE_RIGHT	; If direction = 1, move ships right
-MOVE_LEFT:	LDA&	!M_ENEMIES	; Shift ships to the left
-	CMA#	0	; See if it is a valid port
-	JEQ	CHECK_INDX1	
-	SBA#	1
-	STA	CURR_PORT
-	; See if it is out of screen on left
-	SBA#	$100	
-	MOD#	38
-	CMA#	0	
-	JEQ	RESET1
-	; See if it is hit by a projectile	
-	INB*	CURR_PORT
+CLR_ENEMIES:	LDA&	!M_SPEEDS	; Map speeds to bit
+	CMA#	0
+	JEQ	M_CONTINUE	; All bits off, no movement
+	CMA#	3
+	JLT	M_SPD1
+	CMA#	5
+	JLT	M_SPD2
+	LDA	!M_MV_SPEEDS	; Check if bit is set for speed 3
+	JMP	ME_MOVE
+M_SPD1:	LDA	!M_MV_SPEEDS	; Check if bit is set for speed 1
+	AND#	2
+	JLE	M_CONTINUE
+	JMP	ME_MOVE
+M_SPD2:	LDA	!M_MV_SPEEDS	; Check if bit is set for speed 2
+	AND#	1
+	JLE	M_CONTINUE
+ME_MOVE:	PSH	!M_ENEMIES
+	PSH	!M_SPEEDS
+	PSHX
+	JSR	CLEAR_ENEMY	; Clear current enemy
+	ADS#	3
+	LDA&	!M_SPEEDS	; Get direction (left is odd right is even)
+	MOD#	2
+	JEQ	MOVE_RIGHT
+	DEC&	!M_ENEMIES	; Shift enemy to the left
+	LDA&	!M_ENEMIES
+	STA	ME_CURR_PORT
+	INB*	ME_CURR_PORT	; Check if moving into a projectile
 	CMA#	PROJ_CHAR
-	JNE	SET_ENEMY1
-	CLR&	!M_ENEMIES	
-	PSH	!MP_PROJ
-	PSH	CURR_PORT
+	JNE	ME_CHK_LEFT
+	CLR&	!M_ENEMIES
+	CLR&	!M_SPEEDS
+	DEC	NUM_ENEMIES
+	PSH	!M_PROJECTILES
+	PSH	ME_CURR_PORT
 	PSH#	10
 	JSR	CLEAR_ARRAY
 	ADS#	3
-	JMP	CHECK_INDX1
-	; Not out of screen, save new location
-SET_ENEMY1:	LDA	CURR_PORT		
-	STA&	!M_ENEMIES	
-	JMP	CHECK_INDX1	
-RESET1:	CLR&	!M_ENEMIES	; If proj goes out of screen, clear in array
-CHECK_INDX1:	AOC#	12
-	JLT	MOVE_LEFT
-	JMP	NEW_DISPLAY			
-MOVE_RIGHT:	LDA&	!M_ENEMIES	; Shift ships to the right
-	CMA#	0	; See if it is a valid port
-	JEQ	CHECK_INDX2
+ME_CHK_LEFT:	TXA		; Is right port of enemy past left side of CRT?
 	ADA#	1
-	STA	CURR_PORT
-	; See if it is out of screen on right
-	SBA#	$125	
-	MOD#	38
-	CMA#	0	
-	JEQ	RESET2		
-	; See if it is hit by a projectile	
-	INB*	CURR_PORT
+	MUL#	38
+	ADA#	$FD
+	CMA&	!M_ENEMIES
+	JEQ	RESET_ENEMY
+	JMP	ME_DISPLAY
+MOVE_RIGHT:	INC&	!M_ENEMIES	; Shift enemy to the right
+	LDA&	!M_ENEMIES
+	STA	ME_CURR_PORT
+	INB*	ME_CURR_PORT	; Check if moving into a projectile
 	CMA#	PROJ_CHAR
-	JNE	SET_ENEMY1
-	CLR&	!M_ENEMIES	
-	PSH	!MP_PROJ
-	PSH	CURR_PORT
+	JNE	ME_CHK_RIGHT
+	CLR&	!M_ENEMIES
+	CLR&	!M_SPEEDS
+	DEC 	NUM_ENEMIES
+	PSH	!M_PROJECTILES
+	PSH	ME_CURR_PORT
 	PSH#	10
 	JSR	CLEAR_ARRAY
 	ADS#	3
-	JMP	CHECK_INDX2
-	; Not out of screen, save new location
-SET_ENEMY2:	LDA	CURR_PORT		
-	STA&	!M_ENEMIES	
-	JMP	CHECK_INDX2	
-RESET2:	CLR&	!M_ENEMIES	; If proj goes out of screen, clear in array
-CHECK_INDX2:	AOC#	12
-	JLT	MOVE_RIGHT
-NEW_DISPLAY:	LDX#	0
-DISPLAY_ALL:	LDA&	!M_ENEMIES
-	STA	M_ENMY_PORT
-	PSH	M_ENMY_PORT
-	PSH	!DIRECTION
+ME_CHK_RIGHT:	TXA		; Is left port of enemy past right side of CRT?
+	ADA#	1
+	MUL#	38
+	ADA#	$126
+	CMA&	!M_ENEMIES
+	JNE	ME_DISPLAY
+RESET_ENEMY:	CLR&	!M_ENEMIES	; Delete enemy object
+	CLR&	!M_SPEEDS
+	DEC	NUM_ENEMIES
+	JMP	M_CONTINUE
+ME_DISPLAY:	PSH&	!M_ENEMIES
+	PSHX
 	JSR	DISPLAY_ENEMY	; Redisplay ships at new ports
 	ADS#	2
-	POPX	
+M_CONTINUE:	AOC#	7
+	JLT 	CLR_ENEMIES
+	POPX
 	POPA
-	FIN#	0 	
+	FIN#	0
 	RTN
-M_ENMY_PORT:	.WORD	0
-CURR_PORT:	.WORD	0
+ME_CURR_PORT:	.WORD	0
 
 	; Display enemy ship
-	.EQU	D_ENMY_PORT, 3
-	.EQU	D_DIRECTION, 2
+	.EQU	DE_PORT, 3
+	.EQU	DE_ROW, 2
 DISPLAY_ENEMY:	BGN#	0
-	PSHA	
+	PSHA
 	PSHX
-	LDA	!D_ENMY_PORT
-	STA	TEMP_PORT_R
-	STA	TEMP_PORT_L
-	LDA	!D_DIRECTION
-	CMA#	1
-	JEQ	MOVE_R
-	; Looking at right of screen
-	LDA	TEMP_PORT_L	
-	SBA#	$125	; See if left of ship is at rightmost spot on screen
-	MOD#	38
-	CMA#	0	
-	JEQ	PRINT_L
-	LDA	TEMP_PORT_L
-	ADA#	1	
-	SBA#	$125	; See if left of ship is 1 left of rightmost spot on screen
-	MOD#	38
-	CMA#	0	
-	JEQ	PRINT_MID_L
-	; Looking at left of screen
-MOVE_R:	LDA	TEMP_PORT_R
-	ADA#	2	
-	SBA#	$100	; See if right of ship is at leftmost spot on sceen
-	MOD#	38
-	CMA#	0	
-	JEQ	PRINT_R
-	LDA	TEMP_PORT_R
-	ADA#	1	
-	SBA#	$100	; See if right of ship is 1 right of leftmost spot on screen
-	MOD#	38
-	CMA#	0
-	JEQ	PRINT_MID_R
-	; Print all characters, nothing offscreen
-	LDX# 	1
-	LDA#	'o'
-	OUTB& !D_ENMY_PORT
-	LDA#	'|'	
-	OUTB*	!D_ENMY_PORT
-	ADX#	1		
-	OUTB&	!D_ENMY_PORT
-	JMP	STOP_PRINT
-PRINT_R:	LDX#	2
-	LDA#	'|'			
-	OUTB&	!D_ENMY_PORT
-	JMP	STOP_PRINT
-PRINT_L:	LDX# 	1
-	LDA#	'|'	
-	OUTB*	!D_ENMY_PORT
-	JMP	STOP_PRINT
-PRINT_MID_R:	LDX# 	1
-	LDA#	'o'
-	OUTB& !D_ENMY_PORT
-	LDA#	'|'	
-	ADX#	1		
-	OUTB&	!D_ENMY_PORT
-	JMP	STOP_PRINT
-PRINT_MID_L:	LDX# 	1
-	LDA#	'o'
-	OUTB& !D_ENMY_PORT
-	LDA#	'|'	
-	OUTB*	!D_ENMY_PORT
-	JMP	STOP_PRINT
-STOP_PRINT:	POPX
+	INC	!DE_ROW	; XR is off by 1 since 0 based
+	LDA	!DE_ROW	; Get starting index
+	MUL#	38
+	STA	DE_END
+	ADA#	$100
+	SBA	!DE_PORT
+	JLE	DE_START_0
+	TAX
+	JMP	DE_GET_END
+DE_START_0:	LDX#	0
+DE_GET_END:	LDA	DE_END	; Get ending index
+	ADA#	$125
+	SBA	!DE_PORT
+	CMA#	2
+	JGE	DE_END_2
+	JMP	DE_STORE_END
+DE_END_2:	LDA#	2
+DE_STORE_END:	STA	DE_END
+	; Display enemy
+DE_OUT_LOOP:	TXA
+	MOD#	2
+	JNE	DE_MIDDLE
+	LDA#	'|'
+	JMP	DE_OUT
+DE_MIDDLE:	LDA#	'o'
+DE_OUT:	OUTB&	!DE_PORT
+	AOC	DE_END
+	JLE	DE_OUT_LOOP
+DE_DONE:	POPX
 	POPA
 	FIN# 	0
 	RTN
-TEMP_PORT_L:	.WORD	0
-TEMP_PORT_R:	.WORD	0
+DE_END:	.WORD	0
 
-	; Clear enemy ship from screen 
-	.EQU	C_ENEMIES, 2
+	; Clear enemy ship from screen (also possibly from array)
+	.EQU	C_ENEMIES, 4
+	.EQU	C_SPEEDS, 3
+	.EQU	C_INDEX, 2
 CLEAR_ENEMY:	BGN#	0
 	PSHA
 	PSHX
 	STX	C_INDEX
 	LDA&	!C_ENEMIES
-	STA	C_ENMY_PORT
-	LDX#	0
+	STA	CE_PORT
+	TXA		; Get starting index
+	ADA#	1
+	MUL#	38
+	STA	CE_END
+	ADA#	$100
+	SBA	CE_PORT
+	JLE	CE_START_0
+	TAX
+	JMP	CE_GET_END
+CE_START_0:	LDX#	0
+CE_GET_END:	LDA	CE_END	; Get ending index
+	ADA#	$125
+	SBA	CE_PORT
+	CMA#	2
+	JGE	CE_END_2
+	JMP	CE_STORE_END
+CE_END_2:	LDA#	2
+CE_STORE_END:	STA	CE_END
 	LDA# 	' '	; Clear previous enemy ship position
-CLEAR_ALL:	OUTB&	C_ENMY_PORT
-	AOC#	3
-	JLT	CLEAR_ALL
-	POPX
+CLEAR_ALL:	OUTB&	CE_PORT
+	AOC	CE_END
+	JLE	CLEAR_ALL
+EXIT_CLEAR:	POPX
 	POPA
 	FIN# 	0
 	RTN
-C_ENMY_PORT:	.WORD	0
-C_INDEX:	.WORD	0
+CE_PORT:	.WORD	0
+CE_END:	.WORD	0
 
 	; Spawns an enemy ship
-	.EQU SPEED, 2
+	.EQU 	SPEED, 4	; CBV
+	.EQU	ENEMY_ARR, 3	; CBA
+	.EQU	SPEED_ARR, 2	; CBA
 SPAWN:	BGN#	0
 	PSHA
 	PSHX
-	LDA	!SPEED
-	CMA#	0
-	JNE	ONE
-	LDA#	SPEEDR1
-	JMP	GET_ROW
-ONE:	CMA#	1
-	JNE	TWO
-	LDA#	SPEEDR2
-	JMP	GET_ROW
-TWO:	CMA#	2
-	JNE	THREE
-	LDA#	SPEEDR3
-	JMP	GET_ROW
-THREE:	CMA# 	3
-	JNE	FOUR
-	LDA#	SPEEDL1
-	JMP	GET_ROW
-FOUR:	CMA#	4
-	JNE 	FIVE
-	LDA#	SPEEDL2
-	JMP	GET_ROW
-FIVE:	LDA#	SPEEDL3
-GET_ROW:	STA	S_SPEED_ARR
-	PSH#	5	; Get number between 1-6 inclusive
-	JSR	RANDOM
+	PSH#	5	; Get number between 0-5 inclusive
+	JSR	RANDOM	; This represents the row it goes on
 	ADS#	1
+	TAX
+CHECK_OPEN:	LDA&	!ENEMY_ARR	; Check if no enemy on row
+	CMA#	0
+	JEQ	ROW_GOOD	; XR will store the index to store at
+	AOC#	7
+	JLT	CHECK_OPEN
+	LDX#	0	; Reset to start of array if checking last element
+	JMP	CHECK_OPEN
+ROW_GOOD:	TXA		; Get offset
 	ADA#	1
 	MUL# 	38
 	STA	S_ROW
 	LDA	!SPEED	; Check direction
-	CMA#	3
-	JLT	S_LESS
+	MOD#	2
+	JEQ	S_RIGHT
 	LDA#	$125	; Port = $125 + ACC * 38 if from right
 	JMP 	S_CONT
-S_LESS:	LDA#	$FE	; Port = $100 + ACC * 38 if from left
+S_RIGHT:	LDA#	$FE	; Port = $FE + ACC * 38 if from left
 S_CONT:	ADA	S_ROW
-	STA	S_ROW
-	LDX#	0
-S_PUSH:	LDA&	S_SPEED_ARR
-	CMA#	0
-	JEQ	S_EMPTY
-	AOC#	12
-	JLT	S_PUSH
-S_EMPTY:	TXA
-	ADA	S_SPEED_ARR
-	STA	S_SPEED_ARR
-	LDA	S_ROW
-	STA*	S_SPEED_ARR
+	STA&	!ENEMY_ARR
+	LDA	!SPEED
+	STA&	!SPEED_ARR
 	POPX
 	POPA
 	FIN#	0
 	RTN
-S_SPEED_ARR:	.WORD	0
 S_ROW:	.WORD	0
 
 	; Displays ship at ports
@@ -593,9 +552,9 @@ DISPLAY_SHIP:	BGN#	0
 	LDX# 	1
 	LDA#	'-'
 	OUTB& SHIP_R2
-	LDA#	'|'	
+	LDA#	'|'
 	OUTB*	SHIP_R2
-	ADX#	1		
+	ADX#	1
 	OUTB&	SHIP_R2
 	POPX
 	POPA
@@ -657,9 +616,9 @@ MOVE_DONE:	ADS#	2	; Remove parameters for clear from stack
 	.EQU	RANDOM_MAX, 2
 RANDOM:	BGN#	0
 	LDA 	SEED
-	MUL#	2779
-	ADA#	1997
-	MOD#	2048
+	MUL#	2179
+	ADA#	1892
+	MOD#	295
 	STA	SEED
 	INC	!RANDOM_MAX
 	MOD	!RANDOM_MAX
@@ -702,55 +661,33 @@ KBD_DONE:	LDA#	INTERRUPT_ENA	; Re-enable KBD interrupts
 	POPA
 	IRTN
 
-; For timer and moving everything, we have to plan how things move
-; and how to decide what direction something moves in
-	; Need to decide on a timer count and have objects
-	; move every time count finishes (causing interrupt)
-	; Timer altered from pong code
-; TIMER stores the number of timer cycles
-; After each timer cycle, check if the timer has reached the minimum action delay
-; Make minimum action delay how long each cycle takes? (probably
-; If not, return
-; If so, check against each action and trigger when met number of cycles
+	; Timer ISR
 TIMER_ISR: 	PSHA
 	PSHX
 	PSH#	PROJECTILES
 	;PSH#	SPEEDL1
 	JSR 	MOVE_PROJ	; Move projectile(s)
 	ADS# 	1
-
 	LDX# 	0
-
-; TRYING TO ADD START AND BEAT LEVEL DISPLAY
-DISPLAY_START:	INC+	TIMERS
-	LDA+	TIMERS
-	JSR	START_LVL
-	CMA#	STARTLVL_DELAY
-	JLT	TIMER_DONE
-	PSH#	7
-	JSR	CLR_DISPLAY
-	ADS# 1
-	CLR+	TIMERS
-
-	INC	CURR_LEVEL
-
-	ADX#	1
-	INC+	TIMERS
-	LDA+	TIMERS
-	CMA	SPAWN_DELAY
+	INC	TIMERS
+	LDA	TIMERS
+	CMA#	SPAWN_DELAY
 	;JLT	BOMB_ACTION
 	JLT	T_SPEED1
 	LDA	NUM_ENEMIES
-	CMA#	12	; See if there is room for new enemies
+	CMA#	7	; See if there is room for new enemies
 	;JEQ	BOMB_ACTION
-	JEQ	T_SPEED1
+	JGE	T_SPEED1
 	CLR+	TIMERS
-	PSH#	5	; Get speed
+	PSH#	5	; Get speed (between 1 and 6)
 	JSR	RANDOM
 	ADS#	1
+	ADA#	1
 	PSHA
+	PSH#	ENEMY_SHIPS
+	PSH#	ENEMY_SPDS
 	JSR	SPAWN
-	ADS#	1
+	ADS#	3
 	INC	NUM_ENEMIES
 ;BOMB_ACTION:	ADX#	1
 ;	INC+  TIMERS
@@ -759,65 +696,44 @@ DISPLAY_START:	INC+	TIMERS
 ;	JLT	ENEMY_ACTION
 ;	CLR+	TIMERS
 ;	JSR	MOVE_BOMBS
-T_SPEED1:	ADX#	1
+	; Add to speeds a certain number to make it like CHMOD
+	; One call of move based on the speed value passed
+T_SPEED1:	ADX#	1	; Speeds 1 and 2
 	INC+	TIMERS
 	LDA+	TIMERS
-	CMA	SPD1_DELAY
+	CMA#	SPD1_DELAY
 	JLT	T_SPEED2
 	CLR+	TIMERS
-	PSH#	SPEEDL1
-	PSH#	PROJECTILES
-	PSH#	0
-	JSR	MOVE_ENEMY
-	ADS#	3
-	PSH#	SPEEDR1
-	PSH#	PROJECTILES
-	PSH#	1
-	JSR	MOVE_ENEMY
-	ADS#	3
-T_SPEED2:	ADX#	1
+	INC	MV_SPEEDS
+T_SPEED2:	ADX#	1	; Speeds 3 and 4
 	INC+	TIMERS
 	LDA+	TIMERS
-	CMA	SPD2_DELAY
-	JLT	T_SPEED3
+	CMA#	SPD2_DELAY
+	JLT	ENEMY_ACTION
 	CLR+	TIMERS
-	PSH#	SPEEDL2
+	LDA	MV_SPEEDS
+	ADA#	2
+ENEMY_ACTION:	CMA#	0
+;	JEQ	HIT_CHECKS  or whatever is next
+	JEQ	TIMER_DONE
+	PSHA
+	PSH#	ENEMY_SHIPS
+	PSH#	ENEMY_SPDS
 	PSH#	PROJECTILES
-	PSH#	0
-	JSR	MOVE_ENEMY
-	ADS#	3
-	PSH#	SPEEDR2
-	PSH#	PROJECTILES
-	PSH#	1
-	JSR	MOVE_ENEMY
-	ADS#	3
-T_SPEED3:	ADX#	1
-	INC+	TIMERS
-	LDA+	TIMERS
-	CMA	SPD3_DELAY
-	JLT	TIMER_DONE
-	CLR+	TIMERS
-	PSH#	SPEEDL3
-	PSH#	PROJECTILES
-	PSH#	0
-	JSR	MOVE_ENEMY
-	ADS#	3
-	PSH#	SPEEDR3
-	PSH#	PROJECTILES
-	PSH#	1
-	JSR	MOVE_ENEMY
-	ADS#	3
+	JSR	MOVE_ENEMIES
+	ADS#	4
 ;	JLT	HIT_CHECKS
 ;	ADX#	1
 ;HIT_CHECKS:	JSR	CHECK_HITS	; Hit logic
-TIMER_DONE:	LDA#	ENABLE_AND_RESET
+TIMER_DONE:	CLR	MV_SPEEDS
+	LDA#	ENABLE_AND_RESET
           	OUTB	TIM_CNTL
 	POPX
           	POPA
           	IRTN		; END OF TIMER_ISR
-	; Timers in order of spawn, bombs, enemy ships
-TIMERS:	.BLKW	4, 0
-DELAY:	.WORD 1000	; Game base speed
+MV_SPEEDS:	.WORD	0
+	; Timers in order of spawn, bombs, speeds (2)
+TIMERS:	.BLKW	7, 0
 
 	; Interrupt Vector
 	.EQU @, $FF8
