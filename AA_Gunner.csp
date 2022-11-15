@@ -37,9 +37,9 @@
 	.EQU	BEATLVL_DELAY, 10	; # of timer iters displaying cleared msg
 	.EQU 	BOMB_DELAY, 3	; # of timer iters before dropped bombs move
 	.EQU 	SPAWN_DELAY, 5	; # of iters before enemy ships spawn
-	.EQU	SPD1_DELAY, 6	; # of iters before ships move w/ different speeds
-	.EQU	SPD2_DELAY, 4
-	.EQU	SPD3_DELAY, 2
+	.EQU	SPD1_DELAY, 3	; # of iters before ships move w/ different speeds
+	.EQU	SPD2_DELAY, 2
+	; Speed 3 moves every clock cycle
 
 SETUP:	LDS# 	$E00
 	; Keyboard setup
@@ -223,8 +223,6 @@ CLR_ENEMIES:	LDA&	!M_SPEEDS	; Map speeds to bit
 	CMA#	5
 	JLT	M_SPD2
 	LDA	!M_MV_SPEEDS	; Check if bit is set for speed 3
-	AND#	4
-	JLE	M_CONTINUE
 	JMP	ME_MOVE
 M_SPD1:	LDA	!M_MV_SPEEDS	; Check if bit is set for speed 1
 	AND#	2
@@ -323,12 +321,29 @@ CLEAR_ENEMY:	BGN#	0
 	LDX	!C_INDEX
 	LDA&	!C_ENEMIES
 	STA	CE_PORT
-	LDX#	0
+	TXA		; Get starting index
+	ADA#	1
+	MUL#	38
+	STA	CE_END
+	ADA#	$100
+	SBA	CE_PORT
+	JLE	CE_START_0
+	TAX
+	JMP	CE_GET_END
+CE_START_0:	LDX#	0
+CE_GET_END:	LDA	CE_END	; Get ending index
+	ADA#	$125
+	SBA	CE_PORT
+	CMA#	2
+	JGE	CE_END_2
+	JMP	CE_STORE_END
+CE_END_2:	LDA#	2
+CE_STORE_END:	STA	CE_END
 	LDA# 	' '	; Clear previous enemy ship position
 CLEAR_ALL:	OUTB&	CE_PORT
-	AOC#	3
-	JLT	CLEAR_ALL
-	LDA	!HIT	; See if ship was hit and needs to be cleared from array
+	AOC	CE_END
+	JLE	CLEAR_ALL
+	LDA	!HIT	; Delete ship if hit
 	CMA#	1
 	JNE	EXIT_CLEAR
 	LDX	!C_INDEX
@@ -339,6 +354,7 @@ EXIT_CLEAR:	POPX
 	FIN# 	0
 	RTN
 CE_PORT:	.WORD	0
+CE_END:	.WORD	0
 
 	; Spawns an enemy ship
 	.EQU 	SPEED, 4	; CBV
@@ -452,9 +468,9 @@ MOVE_DONE:	ADS#	2	; Remove parameters for clear from stack
 	.EQU	RANDOM_MAX, 2
 RANDOM:	BGN#	0
 	LDA 	SEED
-	MUL#	2779
-	ADA#	1997
-	MOD#	2048
+	MUL#	2179
+	ADA#	1892
+	MOD#	295
 	STA	SEED
 	INC	!RANDOM_MAX
 	MOD	!RANDOM_MAX
@@ -544,19 +560,10 @@ T_SPEED2:	ADX#	1	; Speeds 3 and 4
 	INC+	TIMERS
 	LDA+	TIMERS
 	CMA#	SPD2_DELAY
-	JLT	T_SPEED3
+	JLT	ENEMY_ACTION
 	CLR+	TIMERS
 	LDA	MV_SPEEDS
 	ADA#	2
-	STA	MV_SPEEDS
-T_SPEED3:	ADX#	1	; Speeds 5 and 6
-	INC+	TIMERS
-	LDA+	TIMERS
-	CMA#	SPD3_DELAY
-	JLT	TIMER_DONE
-	CLR+	TIMERS
-	LDA	MV_SPEEDS
-	ADA#	4	; ACC holds the value for speeds
 ENEMY_ACTION:	CMA#	0
 ;	JEQ	HIT_CHECKS  or whatever is next
 	JEQ	TIMER_DONE
@@ -575,8 +582,8 @@ TIMER_DONE:	CLR	MV_SPEEDS
           	POPA
           	IRTN		; END OF TIMER_ISR
 MV_SPEEDS:	.WORD	0
-	; Timers in order of spawn, bombs, speeds (3)
-TIMERS:	.BLKW	8, 0
+	; Timers in order of spawn, bombs, speeds (2)
+TIMERS:	.BLKW	7, 0
 
 	; Interrupt Vector
 	.EQU @, $FF8
