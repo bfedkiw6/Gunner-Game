@@ -27,6 +27,8 @@
 	; Game Related .EQUs
 	.EQU	GROUND_CHAR, $2D	; ASCII for "-"
 	.EQU	PROJ_CHAR, $A6
+	.EQU	EXPLOSION1, $2A
+	.EQU	EXPLOSION2, $B0
 	; We may need multiple delays to have things move at different speeds
 	; May need to test different delays to see how long in real time it takes
 	; Delay at start of each level (maybe 2-5 seconds long, constant)
@@ -113,7 +115,7 @@ PRINT_PT2:	LDA# '0'
 	LDX#  GROUND	; Set ground to start on last row
 PRINT_GROUND:	OUTB+	0	; Output across whole row
 	AOC# 	CRT_END
-	JLE   PRINT_GROUND	
+	JLE   PRINT_GROUND
 	POPA
 	POPX
 	FIN#  0
