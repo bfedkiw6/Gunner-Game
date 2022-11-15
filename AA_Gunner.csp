@@ -140,7 +140,7 @@ PRINT_SLVL:	LDC	LVL_S_STR
 LVL_S_STR:	.WORD	'Lev'
 LVL_S_STR2:	.WORD	'el '
 
-	; Display on Screen beating level
+	; Display on Screen the beating level
 BEAT_LVL:	BGN# 	0
 	PSHA
 	PSHX
