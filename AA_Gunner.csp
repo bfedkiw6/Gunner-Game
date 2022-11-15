@@ -27,6 +27,8 @@
 	; Game Related .EQUs
 	.EQU	GROUND_CHAR, $2D	; ASCII for "-"
 	.EQU	PROJ_CHAR, $A6
+	.EQU	EXPLOSION1, $2A
+	.EQU	EXPLOSION2, $B0
 	; We may need multiple delays to have things move at different speeds
 	; May need to test different delays to see how long in real time it takes
 	; Delay at start of each level (maybe 2-5 seconds long, constant)
@@ -59,7 +61,7 @@ LOOP:	NOP
 	JMP	LOOP
 	HLT
 DELAY:	.WORD 2600	; Game base speed
-; Stores the ports for ^ and the left | of the ship/AA gun
+	; Stores the ports for ^ and the left | of the ship/AA gun
 SHIP_R1:	.WORD $100 + (11 * CRT_COLS) + (CRT_COLS/2) - 1
 SHIP_R2:	.WORD $100 + (12*CRT_COLS) + (CRT_COLS/2) - 2
 PROJECTILES:	.BLKW	10, 0
@@ -107,7 +109,7 @@ PRINT_PT2:	LDA# '0'
 	LDX#  GROUND	; Set ground to start on last row
 PRINT_GROUND:	OUTB+	0	; Output across whole row
 	AOC# 	CRT_END
-	JLE   PRINT_GROUND	
+	JLE   PRINT_GROUND
 	POPA
 	POPX
 	FIN#  0
@@ -338,11 +340,12 @@ ME_MOVE:	PSH	!M_ENEMIES
 	DEC&	!M_ENEMIES	; Shift enemy to the left
 	LDA&	!M_ENEMIES
 	STA	ME_CURR_PORT
-	INB*	ME_CURR_PORT	; Check if moving into a projectile	
+	INB*	ME_CURR_PORT	; Check if moving into a projectile
 	CMA#	PROJ_CHAR
 	JNE	ME_CHK_LEFT
 	CLR&	!M_ENEMIES
-	CLR&	!M_SPEEDS	
+	CLR&	!M_SPEEDS
+	DEC	NUM_ENEMIES
 	PSH	!M_PROJECTILES
 	PSH	ME_CURR_PORT
 	PSH#	10
@@ -358,11 +361,12 @@ ME_CHK_LEFT:	TXA		; Is right port of enemy past left side of CRT?
 MOVE_RIGHT:	INC&	!M_ENEMIES	; Shift enemy to the right
 	LDA&	!M_ENEMIES
 	STA	ME_CURR_PORT
-	INB*	ME_CURR_PORT	; Check if moving into a projectile	
+	INB*	ME_CURR_PORT	; Check if moving into a projectile
 	CMA#	PROJ_CHAR
 	JNE	ME_CHK_RIGHT
 	CLR&	!M_ENEMIES
-	CLR&	!M_SPEEDS	
+	CLR&	!M_SPEEDS
+	DEC 	NUM_ENEMIES
 	PSH	!M_PROJECTILES
 	PSH	ME_CURR_PORT
 	PSH#	10
@@ -662,7 +666,7 @@ TIMER_ISR: 	PSHA
 ;	CLR+	TIMERS
 ;	JSR	MOVE_BOMBS
 	; Add to speeds a certain number to make it like CHMOD
-	; one call of move based on the speed value passed
+	; One call of move based on the speed value passed
 T_SPEED1:	ADX#	1	; Speeds 1 and 2
 	INC+	TIMERS
 	LDA+	TIMERS
@@ -684,7 +688,7 @@ ENEMY_ACTION:	CMA#	0
 	PSHA
 	PSH#	ENEMY_SHIPS
 	PSH#	ENEMY_SPDS
-    	PSH#	PROJECTILES
+	PSH#	PROJECTILES
 	JSR	MOVE_ENEMIES
 	ADS#	4
 ;	JLT	HIT_CHECKS
