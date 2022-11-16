@@ -37,12 +37,13 @@
 	; Delay for enemy aircraft that changes based on time so need a word
 	.EQU 	STARTLVL_DELAY, 8	; # of timer iters displaying level
 	.EQU	BEATLVL_DELAY, 10	; # of timer iters displaying cleared msg
-	.EQU	DROP_DELAY, 2
+	.EQU	DROP_DELAY, 5
 	.EQU 	BOMB_DELAY, 3	; # of timer iters before dropped bombs move
 	.EQU 	SPAWN_DELAY, 5	; # of iters before enemy ships spawn
 	.EQU	SPD1_DELAY, 3	; # of iters before ships move w/ different speeds
 	.EQU	SPD2_DELAY, 2
 	; Speed 3 moves every clock cycle
+	.EQU	MAX_BOMBS, 21
 
 SETUP:	LDS# 	$E00
 	; Keyboard setup
@@ -72,8 +73,7 @@ CURR_SCORE:	.WORD	0
 NUM_ENEMIES:	.WORD	0
 ENEMY_SHIPS:	.BLKW	7, 0
 ENEMY_SPDS:	.BLKW	7, 0
-BOMBS:	.BLKW 35, 0	; Each ship has 5 bombs max
-BOMB_EMPTY:	.WORD	BOMBS	; Pointer to empty spot in BOMBS
+BOMBS:	.BLKW MAX_BOMBS, 0
 
 	; Subroutines
 	.EQU	@, $100
@@ -665,62 +665,64 @@ MOVE_DONE:	ADS#	2	; Remove parameters for clear from stack
 	RTN
 
 	; Check for empty slot in bomb array and circular loop logic
-	.EQU	BOMBS_END, BOMBS + 59
-	.EQU	PREV_ADDR, 2
+	.EQU	BOMBS_END, BOMBS + MAX_BOMBS - 1
+	.EQU	NE_BOMBS, 3
+	.EQU	NE_PORT, 2
 NEXT_EMPTY:	BGN#	0
 	PSHA
-NEXT_CHECK:	LDA*	!PREV_ADDR
-	ADA#	1
-	CMA#	BOMBS_END
-	JGT	CIRCLE
-	STA*	!PREV_ADDR
-	JMP	NEXT_DONE
-CIRCLE:	LDA#	BOMBS
-	STA*	!PREV_ADDR
-NEXT_DONE:	STA	CURR_ADDR
-	LDA*	CURR_ADDR
+	PSHX
+	LDX#	0
+NEXT_CHECK:	LDA&	!NE_BOMBS
 	CMA#	0
-	JNE	NEXT_CHECK
+	JEQ	NEXT_STORE
+	AOC#	MAX_BOMBS
+	JLT	NEXT_CHECK
+NEXT_STORE:	LDA	!NE_PORT
+	STA&	!NE_BOMBS
+	POPX
 	POPA
 	FIN#	0
 	RTN
 CURR_ADDR:	.WORD 0
 
-	; Drops bombs from all ships' middle port
-	.EQU	DB_BOMB_EMPTY, 8	; CBA for all
-	.EQU	DB_SPD1, 7
-	.EQU	DB_SPD2, 6
-	.EQU	DB_SPD3, 5
-	.EQU	DB_SPD4, 4
-	.EQU	DB_SPD5, 3
-	.EQU	DB_SPD6, 2
+	; Drops bomb from random ship's middle port
+	.EQU	DB_ENEMIES, 3
+	.EQU	DB_BOMBS, 2
 DROP_BOMBS:	BGN#	0
 	PSHA
 	PSHX
-	LDX#	0
-	; For each speed array, check if ship is at index
-	; If so, create a new bomb at BOMB_EMPTY with port being under the tie
-	; and display
-DB_LOOP:	LDA*	!DB_BOMB_EMPTY
-	STA	DB_EMPTY
-	LDA&	!DB_SPD1	; Get port
-	CMA#	0	; Check if empty
-	JEQ	S2
-	ADA#	39	; Drop bomb from one below middle port
-	STA*	DB_EMPTY	; Store at empty address in bomb array
-	PSH#	DB_EMPTY
-	JSR	NEXT_EMPTY
+	PSH#	5	; Get random index
+	JSR	RANDOM
 	ADS#	1
-S2:	
-DB_NXTITR:	AOC#	12
-	JLT	DB_LOOP
-	LDA	DB_EMPTY
-	STA*	!DB_BOMB_EMPTY
-	POPX
+	TAX
+	LDA&	!DB_ENEMIES
+	CMA#	0
+	JEQ	DB_DONE
+	STA	DB_PORT
+	TXA
+	ADA#	1
+	MUL#	38	; Check that middle port is displayed
+	STA	DB_END
+	ADA#	$100	; Check GEQ leftmost port in row
+	SBA	DB_PORT
+	JGT	DB_DONE
+	LDA	DB_END	; Check LEQ rightmost port in row
+	ADA#	$125
+	SBA	DB_PORT
+	CMA#	2
+	JLT	DB_DONE
+	LDA&	!DB_ENEMIES	; Get port under middle of enemy
+	ADA#	39
+	PSH	!DB_BOMBS	; Find empty slot in BOMBS
+	PSHA
+	JSR	NEXT_EMPTY
+	ADS#	2
+DB_DONE:	POPX
 	POPA
 	FIN#	0
 	RTN
-DB_EMPTY:	.WORD 0
+DB_PORT:	.WORD	0
+DB_END:	.WORD	0
 
 	; Random function from pong
 	; Gets a number between 0 and RANDOM_MAX
@@ -784,12 +786,10 @@ TIMER_ISR: 	PSHA
 	INC	TIMERS
 	LDA	TIMERS
 	CMA#	SPAWN_DELAY
-	;JLT	BOMB_ACTION
-	JLT	T_SPEED1
+	JLT	DROP_ACTION
 	LDA	NUM_ENEMIES
 	CMA#	7	; See if there is room for new enemies
-	;JEQ	BOMB_ACTION
-	JGE	T_SPEED1
+	JGE	DROP_ACTION
 	CLR+	TIMERS
 	PSH#	5	; Get speed (between 1 and 6)
 	JSR	RANDOM
@@ -801,13 +801,19 @@ TIMER_ISR: 	PSHA
 	JSR	SPAWN
 	ADS#	3
 	INC	NUM_ENEMIES
-;DROP_ACTION:	ADX#	1	; Drop bombs
-;	INC+	TIMERS
-;	LDA+	TIMERS
-;	CMA#	DROP_DELAY
-;	JLT	BOMB_ACTION
-;	CLR+	TIMERS
-;	JSR	DROP_BOMBS
+DROP_ACTION:	ADX#	1	; Drop bombs
+	INC+	TIMERS
+	LDA+	TIMERS
+	CMA#	DROP_DELAY
+	JLT	T_SPEED1
+	CLR+	TIMERS
+	LDA	NUM_ENEMIES
+	CMA#	0
+	JEQ	T_SPEED1
+	PSH#	ENEMY_SHIPS
+	PSH#	BOMBS
+	JSR	DROP_BOMBS
+	ADS#	2
 ;BOMB_ACTION:	ADX#	1	; Move bombs
 ;	INC+  TIMERS
 ;          	LDA+	TIMERS
