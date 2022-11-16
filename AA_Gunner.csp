@@ -57,6 +57,19 @@ SETUP:	LDS# 	$E00
 	; Probably just the ground, ship, score, level
 	; Let the user have maybe 5 seconds before ships start spawning in
 MAIN:	JSR	START_GAME
+
+	CIE
+DISPLAY_STRT:	JSR	START_LVL
+	INC	COUNTER	
+	LDA	COUNTER
+	CMA#	60
+	JNE	DISPLAY_STRT
+	PSH#	8
+	PSH#	$CD
+	JSR	CLR_DISPLAY
+	ADS#	2
+	SIE
+
 LOOP:	NOP
 	JMP	LOOP
 	HLT
@@ -66,7 +79,8 @@ SHIP_R1:	.WORD $100 + (11 * CRT_COLS) + (CRT_COLS/2) - 1
 SHIP_R2:	.WORD $100 + (12*CRT_COLS) + (CRT_COLS/2) - 2
 PROJECTILES:	.BLKW	10, 0
 SHIP_HEALTH:	.WORD 5
-CURR_LEVEL:	.WORD	$30
+CURR_LEVEL1:	.WORD	$31
+CURR_LEVEL2:	.WORD	$30
 CURR_SCORE:	.WORD	0
 NUM_ENEMIES:	.WORD	0
 ENEMY_SHIPS:	.BLKW	7, 0
@@ -124,6 +138,7 @@ LEVEL_STR2:	.WORD	'el:'
 START_LVL:	BGN# 	0
 	PSHA
 	PSHX
+	LDX#	0
 PRINT_SLVL:	LDC	LVL_S_STR
 	ADX#	$CD
 	OUTB+	CRT_VBUF
@@ -131,7 +146,10 @@ PRINT_SLVL:	LDC	LVL_S_STR
 	AOC#	6	
 	JNE	PRINT_SLVL	
 	ADX#	$CD
-	LDA	CURR_LEVEL
+	LDA	CURR_LEVEL2
+	OUTB+	CRT_VBUF
+	ADX#	1
+	LDA	CURR_LEVEL1
 	OUTB+	CRT_VBUF
 	POPX
 	POPA
@@ -144,6 +162,7 @@ LVL_S_STR2:	.WORD	'el '
 BEAT_LVL:	BGN# 	0
 	PSHA
 	PSHX
+	LDX#	0
 PRINT_BLVL:	LDC	LVL_B_STR
 	ADX#	$C9
 	OUTB+	CRT_VBUF
@@ -161,14 +180,16 @@ LVL_B_STR4:	.WORD	'ple'
 LVL_B_STR5:	.WORD	'te!'
 
 	; Clear start/beat level from screen
-	.EQU	SIZE_WORDS, 2
+	.EQU	SIZE_WORDS, 3
+	.EQU	START_INDEX, 2
 CLR_DISPLAY:	BGN# 	0
 	PSHA
 	PSHX
+	LDX#	0
 CLR_DISP:	LDA#	' '
-	ADX#	$CD
+	ADX	!START_INDEX
 	OUTB+	CRT_VBUF
-	SBX#	$CD
+	SBX	!START_INDEX
 	AOC	!SIZE_WORDS	
 	JNE	CLR_DISP	
 	POPX
@@ -202,8 +223,60 @@ ADD_MAG3:	LDA	CURR_SCORE
 	JMP	FINISH_SCORE
 FINISH_SCORE:	POPX
 	POPA
-	FIN#     0
+	FIN#	0
 	RTN
+
+	; Check if level is complete
+LEVEL_DONE:	BGN#	0
+	PSHA
+	PSHX
+	LDA	NUM_ENEMIES
+	CMA#	0
+	JNE	EXIT_LVL_DNE
+	INC	CURR_LEVEL1
+	; Display beat level 
+	JSR	BEAT_LVL
+BEAT_DISPLAY:	INC	COUNTER	
+	LDA	COUNTER
+	CMA#	500
+	JNE	BEAT_DISPLAY
+	PSH#	16
+	PSH#	$C9
+	JSR	CLR_DISPLAY
+	ADS#	2
+	LDA#	0
+	STA	COUNTER
+	LDX#  37	; Check if second digit is less than or equal to 9
+	LDA	CURR_LEVEL1
+	CMA#	$39
+	JGT	DOUBLE_DIGIT	; Must increment first digit if second digit is greater than 9
+	OUTB+	CRT_VBUF	; Print second digit
+	SBX#	1
+	LDA	CURR_LEVEL2	; Print unchanged first digit
+	OUTB+	CRT_VBUF
+	JMP	PRINTED_LVL
+DOUBLE_DIGIT:	LDA#	$30	; Reset second digit to 0 and print
+	STA	CURR_LEVEL1
+	OUTB+	CRT_VBUF
+	SBX#	1
+	INC	CURR_LEVEL2	; Increment first digit and print
+	LDA	CURR_LEVEL2
+	OUTB+	CRT_VBUF	
+	; Display start level
+PRINTED_LVL:	JSR	START_LVL
+STRT_DISPLAY:	INC	COUNTER	
+	LDA	COUNTER
+	CMA#	500
+	JNE	STRT_DISPLAY
+	PSH#	8
+	PSH#	$CD
+	JSR	CLR_DISPLAY
+	ADS#	2
+EXIT_LVL_DNE:	POPX
+	POPA
+	FIN#	0
+	RTN
+COUNTER:	.WORD	0
 	
 	; Shoot subroutine shoots if no projectile in row above ship
 	.EQU	S_PROJ, 3
@@ -372,10 +445,10 @@ ENMYVAL_LOOP:	LDA&	!ENMY_ARRAY	; Look for where port exists in array
 	JMP	DONE_CLR1
 ARRAY_CHECK1:	AOC#	7
 	JLT	ENMYVAL_LOOP
-DONE_CLR1:	;PSH#	!CLR_SPEEDS	; Add to the score 
-	;PSHX	
-	;JSR	ADD_SCORE
-	;ADS#	2
+DONE_CLR1:	PSH#	!CLR_SPEEDS	; Add to the score 
+	PSHX	
+	JSR	ADD_SCORE
+	ADS#	2
 	POPX
 	POPA
 	FIN# 	0
@@ -425,10 +498,10 @@ ME_MOVE:	PSH	!M_ENEMIES
 	PSH#	10
 	JSR	CLEAR_ARRAY
 	ADS#	3
-	;PSH#	!M_MV_SPEEDS	; Add to the score 
-	;PSHX	
-	;JSR	ADD_SCORE
-	;ADS#	2
+	PSH#	!M_MV_SPEEDS	; Add to the score 
+	PSHX	
+	JSR	ADD_SCORE
+	ADS#	2
 	JMP	RESET_ENEMY
 ME_CHK_LEFT:	TXA		; Is right port of enemy past left side of CRT?
 	ADA#	1
@@ -449,10 +522,10 @@ MOVE_RIGHT:	INC&	!M_ENEMIES	; Shift enemy to the right
 	PSH#	10
 	JSR	CLEAR_ARRAY
 	ADS#	3
-	;PSH#	!M_MV_SPEEDS	; Add to the score 
-	;PSHX	
-	;JSR	ADD_SCORE
-	;ADS#	2
+	PSH#	!M_MV_SPEEDS	; Add to the score 
+	PSHX	
+	JSR	ADD_SCORE
+	ADS#	2
 	JMP	RESET_ENEMY
 ME_CHK_RIGHT:	TXA		; Is left port of enemy past right side of CRT?
 	ADA#	1
