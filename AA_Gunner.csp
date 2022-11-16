@@ -37,6 +37,7 @@
 	; Delay for enemy aircraft that changes based on time so need a word
 	.EQU 	STARTLVL_DELAY, 8	; # of timer iters displaying level
 	.EQU	BEATLVL_DELAY, 10	; # of timer iters displaying cleared msg
+	.EQU	DROP_DELAY, 2
 	.EQU 	BOMB_DELAY, 3	; # of timer iters before dropped bombs move
 	.EQU 	SPAWN_DELAY, 5	; # of iters before enemy ships spawn
 	.EQU	SPD1_DELAY, 3	; # of iters before ships move w/ different speeds
@@ -70,6 +71,8 @@ CURR_LEVEL:	.WORD	$30
 NUM_ENEMIES:	.WORD	0
 ENEMY_SHIPS:	.BLKW	7, 0
 ENEMY_SPDS:	.BLKW	7, 0
+BOMBS:	.BLKW 35, 0	; Each ship has 5 bombs max
+BOMB_EMPTY:	.WORD	BOMBS	; Pointer to empty spot in BOMBS
 
 	; Subroutines
 	.EQU	@, $100
@@ -580,7 +583,66 @@ MOVE_DONE:	ADS#	2	; Remove parameters for clear from stack
 	FIN#	0
 	RTN
 
+	; Check for empty slot in bomb array and circular loop logic
+	.EQU	BOMBS_END, BOMBS + 59
+	.EQU	PREV_ADDR, 2
+NEXT_EMPTY:	BGN#	0
+	PSHA
+NEXT_CHECK:	LDA*	!PREV_ADDR
+	ADA#	1
+	CMA#	BOMBS_END
+	JGT	CIRCLE
+	STA*	!PREV_ADDR
+	JMP	NEXT_DONE
+CIRCLE:	LDA#	BOMBS
+	STA*	!PREV_ADDR
+NEXT_DONE:	STA	CURR_ADDR
+	LDA*	CURR_ADDR
+	CMA#	0
+	JNE	NEXT_CHECK
+	POPA
+	FIN#	0
+	RTN
+CURR_ADDR:	.WORD 0
+
+	; Drops bombs from all ships' middle port
+	.EQU	DB_BOMB_EMPTY, 8	; CBA for all
+	.EQU	DB_SPD1, 7
+	.EQU	DB_SPD2, 6
+	.EQU	DB_SPD3, 5
+	.EQU	DB_SPD4, 4
+	.EQU	DB_SPD5, 3
+	.EQU	DB_SPD6, 2
+DROP_BOMBS:	BGN#	0
+	PSHA
+	PSHX
+	LDX#	0
+	; For each speed array, check if ship is at index
+	; If so, create a new bomb at BOMB_EMPTY with port being under the tie
+	; and display
+DB_LOOP:	LDA*	!DB_BOMB_EMPTY
+	STA	DB_EMPTY
+	LDA&	!DB_SPD1	; Get port
+	CMA#	0	; Check if empty
+	JEQ	S2
+	ADA#	39	; Drop bomb from one below middle port
+	STA*	DB_EMPTY	; Store at empty address in bomb array
+	PSH#	DB_EMPTY
+	JSR	NEXT_EMPTY
+	ADS#	1
+S2:	
+DB_NXTITR:	AOC#	12
+	JLT	DB_LOOP
+	LDA	DB_EMPTY
+	STA*	!DB_BOMB_EMPTY
+	POPX
+	POPA
+	FIN#	0
+	RTN
+DB_EMPTY:	.WORD 0
+
 	; Random function from pong
+	; Gets a number between 0 and RANDOM_MAX
 	.EQU	RANDOM_MAX, 2
 RANDOM:	BGN#	0
 	LDA 	SEED
@@ -657,11 +719,18 @@ TIMER_ISR: 	PSHA
 	JSR	SPAWN
 	ADS#	3
 	INC	NUM_ENEMIES
-;BOMB_ACTION:	ADX#	1
+;DROP_ACTION:	ADX#	1	; Drop bombs
+;	INC+	TIMERS
+;	LDA+	TIMERS
+;	CMA#	DROP_DELAY
+;	JLT	BOMB_ACTION
+;	CLR+	TIMERS
+;	JSR	DROP_BOMBS
+;BOMB_ACTION:	ADX#	1	; Move bombs
 ;	INC+  TIMERS
 ;          	LDA+	TIMERS
 ;	CMA#	BOMB_DELAY
-;	JLT	ENEMY_ACTION
+;	JLT 	HIT_CHECKS
 ;	CLR+	TIMERS
 ;	JSR	MOVE_BOMBS
 	; Add to speeds a certain number to make it like CHMOD
@@ -690,6 +759,7 @@ ENEMY_ACTION:	CMA#	0
 	PSH#	PROJECTILES
 	JSR	MOVE_ENEMIES
 	ADS#	4
+
 ;	JLT	HIT_CHECKS
 ;	ADX#	1
 ;HIT_CHECKS:	JSR	CHECK_HITS	; Hit logic
