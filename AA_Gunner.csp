@@ -177,29 +177,29 @@ CLR_DISP:	LDA#	' '
 	RTN
 
 	; Add to the Score
-   	 .EQU    SPEED_ARRAY, 2
-ADD_SCORE:	BGN#    0
+	.EQU    SPEED_ARRAY, 2
+ADD_SCORE:	BGN#	0
 	PSHA
 	PSHX
-	LDA&    !SPEED_ARRAY    ; Use index from enemy to look at corresponding speed
-	CMA#    3
-	JLT    ADD_MAG1
-	CMA#    5
-	JLT    ADD_MAG2
-	CMA#    7
-	JLT    ADD_MAG3
-ADD_MAG1:	LDA    CURR_SCORE
-	ADA#    3
-	STA    CURR_SCORE
-	JMP    FINISH_SCORE
-ADD_MAG2:	LDA    CURR_SCORE
-	ADA#    5
-	STA    CURR_SCORE
-	JMP    FINISH_SCORE
-ADD_MAG3:	LDA    CURR_SCORE
-	ADA#    7
-	STA    CURR_SCORE
-	JMP    FINISH_SCORE
+	LDA&	!SPEED_ARRAY    ; Use index from enemy to look at corresponding speed
+	CMA#	3
+	JLT 	ADD_MAG1
+	CMA#	5
+	JLT	ADD_MAG2
+	CMA#  7
+	JLT	ADD_MAG3
+ADD_MAG1:	LDA	CURR_SCORE
+	ADA#	3
+	STA	CURR_SCORE
+	JMP	FINISH_SCORE
+ADD_MAG2:	LDA	CURR_SCORE
+	ADA#	5
+	STA	CURR_SCORE
+	JMP	FINISH_SCORE
+ADD_MAG3:	LDA	CURR_SCORE
+	ADA#	7
+	STA	CURR_SCORE
+	JMP	FINISH_SCORE
 FINISH_SCORE:	POPX
 	POPA
 	FIN#     0
@@ -272,6 +272,7 @@ CLEAR_PE:	CLR&	!M_PROJ
 	PSH	ADD
 	JSR	CLEAR_ENMYVAL
 	ADS#	4
+	;DEC	NUM_ENEMIES	; Decrease number of enemies
 	JMP	CHECK_INDEX
 	; Not out of screen & did not hit enemy ship, save new location	
 SAVE_PROJ:	LDA	PROJ_PORT	
@@ -365,13 +366,17 @@ ENMYVAL_LOOP:	LDA&	!ENMY_ARRAY	; Look for where port exists in array
 	LDA#	' '
 	OUTB*	!PORT2
 	INC	!PORT2
-	OUTB&	!PORT2
+	OUTB*	!PORT2
 	INC	!PORT2
-	OUTB&	!PORT2
+	OUTB*	!PORT2
 	JMP	DONE_CLR1
 ARRAY_CHECK1:	AOC#	7
 	JLT	ENMYVAL_LOOP
-DONE_CLR1:	POPX
+DONE_CLR1:	;PSH#	!CLR_SPEEDS	; Add to the score 
+	;PSHX	
+	;JSR	ADD_SCORE
+	;ADS#	2
+	POPX
 	POPA
 	FIN# 	0
 	RTN
@@ -420,6 +425,10 @@ ME_MOVE:	PSH	!M_ENEMIES
 	PSH#	10
 	JSR	CLEAR_ARRAY
 	ADS#	3
+	;PSH#	!M_MV_SPEEDS	; Add to the score 
+	;PSHX	
+	;JSR	ADD_SCORE
+	;ADS#	2
 	JMP	RESET_ENEMY
 ME_CHK_LEFT:	TXA		; Is right port of enemy past left side of CRT?
 	ADA#	1
@@ -440,6 +449,10 @@ MOVE_RIGHT:	INC&	!M_ENEMIES	; Shift enemy to the right
 	PSH#	10
 	JSR	CLEAR_ARRAY
 	ADS#	3
+	;PSH#	!M_MV_SPEEDS	; Add to the score 
+	;PSHX	
+	;JSR	ADD_SCORE
+	;ADS#	2
 	JMP	RESET_ENEMY
 ME_CHK_RIGHT:	TXA		; Is left port of enemy past right side of CRT?
 	ADA#	1
