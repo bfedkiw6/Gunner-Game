@@ -68,6 +68,7 @@ SHIP_R2:	.WORD $100 + (12*CRT_COLS) + (CRT_COLS/2) - 2
 PROJECTILES:	.BLKW	10, 0
 SHIP_HEALTH:	.WORD 5
 CURR_LEVEL:	.WORD	$30
+CURR_SCORE:	.WORD	0
 NUM_ENEMIES:	.WORD	0
 ENEMY_SHIPS:	.BLKW	7, 0
 ENEMY_SPDS:	.BLKW	7, 0
@@ -177,6 +178,35 @@ CLR_DISP:	LDA#	' '
 	POPA
 	FIN# 	0
 	RTN
+
+	; Add to the Score
+	.EQU    SPEED_ARRAY, 2
+ADD_SCORE:	BGN#	0
+	PSHA
+	PSHX
+	LDA&	!SPEED_ARRAY    ; Use index from enemy to look at corresponding speed
+	CMA#	3
+	JLT 	ADD_MAG1
+	CMA#	5
+	JLT	ADD_MAG2
+	CMA#  7
+	JLT	ADD_MAG3
+ADD_MAG1:	LDA	CURR_SCORE
+	ADA#	3
+	STA	CURR_SCORE
+	JMP	FINISH_SCORE
+ADD_MAG2:	LDA	CURR_SCORE
+	ADA#	5
+	STA	CURR_SCORE
+	JMP	FINISH_SCORE
+ADD_MAG3:	LDA	CURR_SCORE
+	ADA#	7
+	STA	CURR_SCORE
+	JMP	FINISH_SCORE
+FINISH_SCORE:	POPX
+	POPA
+	FIN#     0
+	RTN
 	
 	; Shoot subroutine shoots if no projectile in row above ship
 	.EQU	S_PROJ, 3
@@ -208,41 +238,48 @@ DONE:	POPX
 S_PORT:	.WORD	0
 
 	; Get new position for each projectile
-	.EQU	M_PROJ, 2
-	;.EQU	MP_ENEMIES, 2
+	.EQU	MP_PROJ, 4
+	.EQU	MP_ENEMIES, 3
+	.EQU	MP_SPEEDS, 2
 MOVE_PROJ:	BGN# 	0
 	PSHA
 	PSHX
-	PSH	!M_PROJ	
+	PSH	!MP_PROJ	
 	JSR	CLEAR_PROJ	; Clear current projectiles
 	ADS#	1
 	LDX#	0
-MOVING:	LDA&	!M_PROJ	; Shift projectiles up a row
+MOVING:	LDA&	!MP_PROJ	; Shift projectiles up a row
+	STA	CLR_PORT	; For clearing if there is a collision
 	SBA#	38
 	STA	PROJ_PORT
-	CMA#	$126	; See if it is out playing field
+	CMA#	$126	; See if it is above second row
 	JLT	RESET
 	; Check if projectile hits an enemy ship
-	;INB*	PROJ_PORT
-	;CMA#	'|'
-	;JEQ	CLEAR_PE	; There is a hit
-	;CMA#	'o'
-	;JEQ	CLEAR_PE	; There is a hit
-	;JMP	CHECK_INDEX	; No hit, continue moving projectiles
-;CLEAR_PE:	CLR&	!M_PROJ	
-	;PSH	!MP_ENEMIES
-	;PSH	PROJ_PORT
-	;PSH#	7
-	;JSR	CLEAR_ARRAY
-	;ADS#	3
-	;JMP	CHECK_INDEX
+	INB*	PROJ_PORT
+	CMA#	'|'
+	JEQ	CLEAR_PE	; There is a hit
+	CMA#	'o'
+	JNE	SAVE_PROJ	; No hit, continue moving projectiles
+CLEAR_PE:	LDA	PROJ_PORT	; Calculate index in enemies and speeds
+	SBA#	$FF
+	DIV#	38
+	SBA#	1
+	PSH	CLR_PORT
+	PSH	!MP_PROJ
+	PSHA
+	PSH	!MP_ENEMIES
+	PSH	!MP_SPEEDS
+	JSR	PROJ_ENEMY
+	ADS#	5
+	JMP	CHECK_INDEX
 	; Not out of screen & did not hit enemy ship, save new location	
-	STA&	!M_PROJ	
+SAVE_PROJ:	LDA	PROJ_PORT	
+	STA&	!MP_PROJ
 	JMP	CHECK_INDEX	
-RESET:	CLR&	!M_PROJ	; If proj goes out of screen, clear in array
+RESET:	CLR&	!MP_PROJ	; If proj goes out of screen, clear in array
 CHECK_INDEX:	AOC#	10
 	JLT	MOVING
-	PSH	!M_PROJ
+	PSH	!MP_PROJ
 	JSR	DISPLAY_PROJ	; Redisplay projectiles at new ports
 	ADS#	1
 	POPX	
@@ -250,6 +287,7 @@ CHECK_INDEX:	AOC#	10
 	FIN#	0 	
 	RTN
 PROJ_PORT:	.WORD	0
+CLR_PORT:	.WORD	0
 
 	; Display projectiles
 	.EQU	D_PROJ, 2
@@ -307,6 +345,37 @@ ARRAY_CHECK:	AOC	!SIZE
 	FIN# 	0
 	RTN
 
+	; Projectile enemy collision handling
+	.EQU	PE_PORT, 6
+	.EQU	PE_PROJECTILES, 5
+	.EQU	PE_INDEX, 4
+	.EQU	PE_ENEMIES, 3
+	.EQU	PE_SPEEDS, 2
+PROJ_ENEMY:	BGN#	0
+	PSHA
+	PSHX
+	PSH	!PE_ENEMIES
+	PSH	!PE_SPEEDS
+	PSH	!PE_INDEX
+	JSR	CLEAR_ENEMY
+	ADS#	3
+	LDX	!PE_INDEX
+	CLR&	!PE_ENEMIES
+	CLR&	!PE_SPEEDS
+	DEC	NUM_ENEMIES
+	LDX#	0
+PE_LOOP:	LDA&	!PE_PROJECTILES	; Look for where port exists in array
+	CMA	!PE_PORT
+	JNE	PE_CHECK
+	CLR&	!PE_PROJECTILES
+	JMP	PE_DONE
+PE_CHECK:	AOC	!10
+	JLT	PE_LOOP
+PE_DONE:	POPX
+	POPA
+	FIN# 	0
+	RTN
+
 	; Move enemy ships
 	.EQU	M_MV_SPEEDS, 5	; 2 bits to represent each speed
 	.EQU	M_ENEMIES, 4
@@ -346,12 +415,18 @@ ME_MOVE:	PSH	!M_ENEMIES
 	INB*	ME_CURR_PORT	; Check if moving into a projectile
 	CMA#	PROJ_CHAR
 	JNE	ME_CHK_LEFT
-	PSH	!M_PROJECTILES
 	PSH	ME_CURR_PORT
-	PSH#	10
-	JSR	CLEAR_ARRAY
-	ADS#	3
-	JMP	RESET_ENEMY
+	PSH	!M_PROJECTILES
+	PSHX
+	PSH	!M_ENEMIES
+	PSH	!M_SPEEDS
+	JSR	PROJ_ENEMY
+	ADS#	5
+	;PSH#	!M_MV_SPEEDS	; Add to the score 
+	;PSHX	
+	;JSR	ADD_SCORE
+	;ADS#	2
+	JMP	M_CONTINUE
 ME_CHK_LEFT:	TXA		; Is right port of enemy past left side of CRT?
 	ADA#	1
 	MUL#	38
@@ -366,12 +441,18 @@ MOVE_RIGHT:	INC&	!M_ENEMIES	; Shift enemy to the right
 	INB*	ME_CURR_PORT	; Check if moving into a projectile
 	CMA#	PROJ_CHAR
 	JNE	ME_CHK_RIGHT
-	PSH	!M_PROJECTILES
 	PSH	ME_CURR_PORT
-	PSH#	10
-	JSR	CLEAR_ARRAY
-	ADS#	3
-	JMP	RESET_ENEMY
+	PSH	!M_PROJECTILES
+	PSHX
+	PSH	!M_ENEMIES
+	PSH	!M_SPEEDS
+	JSR	PROJ_ENEMY
+	ADS#	5
+	;PSH#	!M_MV_SPEEDS	; Add to the score 
+	;PSHX	
+	;JSR	ADD_SCORE
+	;ADS#	2
+	JMP	M_CONTINUE
 ME_CHK_RIGHT:	TXA		; Is left port of enemy past right side of CRT?
 	ADA#	1
 	MUL#	38
@@ -436,14 +517,14 @@ DE_DONE:	POPX
 	RTN
 DE_END:	.WORD	0
 
-	; Clear enemy ship from screen (also possibly from array)
+	; Clear enemy ship from screen
 	.EQU	C_ENEMIES, 4
 	.EQU	C_SPEEDS, 3
 	.EQU	C_INDEX, 2
 CLEAR_ENEMY:	BGN#	0
 	PSHA
 	PSHX
-	STX	C_INDEX
+	LDX	!C_INDEX
 	LDA&	!C_ENEMIES
 	STA	CE_PORT
 	TXA		; Get starting index
@@ -695,9 +776,10 @@ KBD_DONE:	LDA#	INTERRUPT_ENA	; Re-enable KBD interrupts
 TIMER_ISR: 	PSHA
 	PSHX
 	PSH#	PROJECTILES
-	;PSH#	SPEEDL1
+	PSH#	ENEMY_SHIPS
+	PSH#	ENEMY_SPDS
 	JSR 	MOVE_PROJ	; Move projectile(s)
-	ADS# 	1
+	ADS# 	3
 	LDX# 	0
 	INC	TIMERS
 	LDA	TIMERS
