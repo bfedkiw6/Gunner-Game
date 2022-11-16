@@ -15,7 +15,7 @@
 	.EQU 	CRT_CNTL, $316
 	.EQU 	CRT_ROWS, $0E	; Number of rows in CRT
 	.EQU 	CRT_COLS, $26	; Number of columns per row
-          	.EQU 	CLEAR_DISPLAY, $01
+         	.EQU 	CLEAR_DISPLAY, $01
 	.EQU 	BELL, $06
 
 	.EQU 	INTERRUPT_ENA, $80
@@ -765,12 +765,12 @@ ENEMY_ACTION:	CMA#	0
 ;HIT_CHECKS:	JSR	CHECK_HITS	; Hit logic
 TIMER_DONE:	CLR	MV_SPEEDS
 	LDA#	ENABLE_AND_RESET
-          	OUTB	TIM_CNTL
+         	OUTB	TIM_CNTL
 	POPX
-          	POPA
-          	IRTN		; END OF TIMER_ISR
+         	POPA
+         	IRTN		; END OF TIMER_ISR
 MV_SPEEDS:	.WORD	0
-	; Timers in order of spawn, bombs, speeds (2)
+	; Timers in order of spawn, dropping, bombs, speeds (2)
 TIMERS:	.BLKW	7, 0
 
 	; Interrupt Vector
@@ -778,3 +778,4 @@ TIMERS:	.BLKW	7, 0
 	.WORD KBD_ISR
 	.EQU @, $FFB
 	.WORD	TIMER_ISR
+
