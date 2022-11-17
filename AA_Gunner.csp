@@ -268,7 +268,7 @@ ADD_SCORE:	BGN#	0
 	PSHA
 	PSHX
 	; Use index from enemy to look at corresponding speed
-	LDX#	ENEMY_INDEX
+	LDX	!ENEMY_INDEX
 	LDA&	!SPEED_ARRAY
 	CMA#	3
 	JLT 	ADD_MAG1
