@@ -84,7 +84,9 @@ LOOP:	LDA+	BOMBS
 CONTINUE:	AOC#	MAX_BOMBS
 	JLT	LOOP
 	JMP	RESET
-DELAY:	.WORD 2600	; Game base speed
+	; Decreasing delay will make enemy ships, proj, and player move smoother
+	; but make bombs fall slower (because more interrupts)
+DELAY:	.WORD 2000	; Game base speed
 	; Stores the ports for ^ and the left | of the ship/AA gun
 SHIP_R1:	.WORD $100 + (11 * CRT_COLS) + (CRT_COLS/2) - 1
 SHIP_R2:	.WORD $100 + (12*CRT_COLS) + (CRT_COLS/2) - 2
