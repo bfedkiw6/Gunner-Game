@@ -48,6 +48,7 @@
 	.EQU 	SPAWN_DELAY, 5	; # of iters before enemy ships spawn
 	.EQU	SPD1_DELAY, 3	; # of iters before ships move w/ different spds
 	.EQU	SPD2_DELAY, 2
+	.EQU	DISPLAY_DELAY, 4000
 	; Speed 3 moves every clock cycle
 	.EQU	MAX_BOMBS, 15
 
@@ -305,7 +306,7 @@ LEVEL_DONE:	BGN#	0
 	; Display beat level
 	JSR	BEAT_LVL
 	LDX#	0
-BEAT_DISPLAY:	AOC#	3000
+BEAT_DISPLAY:	AOC#	DISPLAY_DELAY
 	JLT	BEAT_DISPLAY
 	PSH#	16
 	PSH#	$C9
@@ -321,7 +322,7 @@ BEAT_DISPLAY:	AOC#	3000
 	; Display start level
 PRINTED_LVL:	JSR	START_LVL
 	LDX#	0
-STRT_DISPLAY:	AOC#	3000
+STRT_DISPLAY:	AOC#	DISPLAY_DELAY
 	JLT	STRT_DISPLAY
 	PSH#	8
 	PSH#	$CD
@@ -811,6 +812,10 @@ RESET_ENEMY:	LDA#	' '
 	CLR&	!M_ENEMIES	; Delete enemy object
 	CLR&	!M_SPEEDS
 	DEC	NUM_ENEMIES
+	DEC	NAVY_SIZE
+	LDA	NAVY_SIZE
+	CMA#	0
+	JSR	LEVEL_DONE
 	JMP	M_CONTINUE
 ME_DISPLAY:	PSH&	!M_ENEMIES
 	PSHX
