@@ -31,8 +31,8 @@
 
 	; Game Related .EQUs
 	.EQU	GROUND_CHAR, $2D	; ASCII for "-"
-	.EQU	PROJ_CHAR, $A6
-	.EQU	BOMB_CHAR, $A4
+	.EQU	PROJ_CHAR, $A6	; ASCII for double vertical dash
+	.EQU	BOMB_CHAR, $A4	; ASCII for currency sign
 	.EQU	EXPLOSION1, $2A
 	.EQU	EXPLOSION2, $B0
 	; We may need multiple delays to have things move at different speeds
@@ -96,9 +96,10 @@ DELAY:	.WORD 2000	; Game base speed
 SHIP_R1:	.WORD $100 + (11 * CRT_COLS) + (CRT_COLS/2) - 1
 SHIP_R2:	.WORD $100 + (12*CRT_COLS) + (CRT_COLS/2) - 2
 PROJECTILES:	.BLKW	10, 0
-SHIP_HEALTH:	.WORD 5
+SHIP_HEALTH:	.WORD 100	; Change to a smaller num for IG
 CURR_LEVEL:	.WORD	1
 CURR_SCORE:	.WORD	0
+NAVY_SIZE:	.WORD	7	; Each level has 7 * level enemies
 NUM_ENEMIES:	.WORD	0
 ENEMY_SHIPS:	.BLKW	7, 0
 ENEMY_SPDS:	.BLKW	7, 0
@@ -152,7 +153,7 @@ START_LVL:	BGN# 	0
 	LDX#	0
 PRINT_SLVL:	LDC	LVL_S_STR
 	OUTB&	SL_PORT
-	AOC#	6	
+	AOC#	6
 	JLT	PRINT_SLVL
 	LDA#	22
 	OUTB	CRT_X
@@ -166,7 +167,7 @@ PRINT_SLVL:	LDC	LVL_S_STR
 	POPA
 	FIN# 	0
 	RTN
-LVL_S_STR:	.WORD	'Lev'	
+LVL_S_STR:	.WORD	'Lev'
 	.WORD	'el '
 SL_PORT:	.WORD	$1CD
 
@@ -183,7 +184,7 @@ PRINT_BLVL:	LDC	LVL_B_STR
 	POPA
 	FIN# 	0
 	RTN
-LVL_B_STR:	.WORD	'Lev'	
+LVL_B_STR:	.WORD	'Lev'
 	.WORD	'el '
 	.WORD	'Com'
 	.WORD	'ple'
@@ -255,7 +256,7 @@ PUT_LEVEL:	BGN# 	0
 	POPA
 	FIN# 	0
 	RTN
-		
+
 	; Add to the Score
 	.EQU	SPEED_ARRAY, 3
 	.EQU	ENEMY_INDEX, 2
@@ -292,10 +293,13 @@ FINISH_SCORE:	POPX
 LEVEL_DONE:	BGN#	0
 	PSHA
 	PSHX
-	LDA	NUM_ENEMIES
+	LDA	NAVY_SIZE
 	CMA#	0
 	JNE	EXIT_LVL_DNE
-	;INC	CURR_LEVEL1
+	CIE		; Finish displaying stuff
+	LDA#	7	; Get new enemy total
+	;MUL	CURR_LEVEL
+	STA	NAVY_SIZE
 	; Display beat level
 	JSR	BEAT_LVL
 BEAT_DISPLAY:	INC	COUNTER
@@ -347,7 +351,7 @@ DISPLAY_SHIP:	BGN#	0
 	ADS#	1	; Reuse 1 on stack
 	LDA#	'-'
 	OUTB& SHIP_R2
-	LDA#	'|'	
+	LDA#	'|'
 	OUTB*	SHIP_R2
 	ADX#	1
 	OUTB&	SHIP_R2
@@ -635,7 +639,7 @@ CLEAR_PE:	LDA	PROJ_PORT	; Calculate index in enemies and speeds
 	; Not out of screen & did not hit enemy ship, save new location
 SAVE_PROJ:	LDA	PROJ_PORT
 	STA&	!MP_PROJ
-	JMP	CHECK_INDEX	
+	JMP	CHECK_INDEX
 MP_RESET:	CLR&	!MP_PROJ	; If proj goes out of screen, clear in array
 CHECK_INDEX:	AOC#	10
 	JLT	MOVING
@@ -716,7 +720,9 @@ PE_LOOP:	LDA&	!PE_PROJECTILES	; Look for where port exists in array
 	JMP	PE_DONE
 PE_CHECK:	AOC	!10
 	JLT	PE_LOOP
-PE_DONE:	POPX
+PE_DONE:	DEC	NAVY_SIZE
+	JSR	LEVEL_DONE
+	POPX
 	POPA
 	FIN# 	0
 	RTN
@@ -1005,6 +1011,8 @@ TIMER_ISR: 	PSHA
 	LDA	NUM_ENEMIES
 	CMA#	7	; See if there is room for new enemies
 	JGE	DROP_ACTION
+	CMA	NAVY_SIZE
+	JGE	DROP_ACTION
 	CLR+	TIMERS
 	PSH#	5	; Get speed (between 1 and 6)
 	JSR	RANDOM
@@ -1029,13 +1037,6 @@ DROP_ACTION:	ADX#	1	; Drop bombs
 	PSH#	BOMBS
 	JSR	DROP_BOMBS
 	ADS#	2
-;BOMB_ACTION:	ADX#	1	; Move bombs
-;	INC+  TIMERS
-;          	LDA+	TIMERS
-;	CMA#	BOMB_DELAY
-;	JLT 	HIT_CHECKS
-;	CLR+	TIMERS
-;	JSR	MOVE_BOMBS
 	; Add to speeds a certain number to make it like CHMOD
 	; One call of move based on the speed value passed
 T_SPEED1:	ADX#	1	; Speeds 1 and 2
@@ -1053,8 +1054,7 @@ T_SPEED2:	ADX#	1	; Speeds 3 and 4
 	CLR+	TIMERS
 	LDA	MV_SPEEDS
 	ADA#	2
-ENEMY_ACTION:	CMA#	0
-;	JEQ	HIT_CHECKS  or whatever is next
+ENEMY_ACTION:	CMA#	0	; Moves enemies based on MV_SPEEDS
 	JEQ	TIMER_DONE
 	PSHA
 	PSH#	ENEMY_SHIPS
@@ -1062,10 +1062,6 @@ ENEMY_ACTION:	CMA#	0
 	PSH#	PROJECTILES
 	JSR	MOVE_ENEMIES
 	ADS#	4
-
-;	JLT	HIT_CHECKS
-;	ADX#	1
-;HIT_CHECKS:	JSR	CHECK_HITS	; Hit logic
 TIMER_DONE:	CLR	MV_SPEEDS
 	LDA#	ENABLE_AND_RESET
          	OUTB	TIM_CNTL
@@ -1073,12 +1069,11 @@ TIMER_DONE:	CLR	MV_SPEEDS
          	POPA
          	IRTN		; END OF TIMER_ISR
 MV_SPEEDS:	.WORD	0
-	; Timers in order of spawn, dropping, bombs, speeds (2)
-TIMERS:	.BLKW	7, 0
+	; Timers in order of spawn, dropping, speeds (2)
+TIMERS:	.BLKW	4, 0
 
 	; Interrupt Vector
 	.EQU @, $FF8
 	.WORD KBD_ISR
 	.EQU @, $FFB
 	.WORD	TIMER_ISR
-
