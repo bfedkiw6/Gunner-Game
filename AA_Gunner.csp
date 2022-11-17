@@ -15,6 +15,9 @@
 	.EQU 	CRT_CNTL, $316
 	.EQU 	CRT_ROWS, $0E	; Number of rows in CRT
 	.EQU 	CRT_COLS, $26	; Number of columns per row
+	.EQU	CRT_X, $314
+	.EQU	CRT_Y, $315
+	.EQU	CRT_DATA, $317
          	.EQU 	CLEAR_DISPLAY, $01
 	.EQU 	BELL, $06
 
@@ -23,6 +26,8 @@
 	.EQU 	START_AFTER_LOAD, $10
 	.EQU 	ENABLE_RESET_AND_START, $D0
 	.EQU 	ENABLE_AND_RESET, $C0
+
+	.EQU	PUT_NUM2, $E07
 
 	; Game Related .EQUs
 	.EQU	GROUND_CHAR, $2D	; ASCII for "-"
@@ -59,10 +64,10 @@ SETUP:	LDS# 	$E00
 	; Probably just the ground, ship, score, level
 	; Let the user have maybe 5 seconds before ships start spawning in
 MAIN:	JSR	START_GAME
-DISPLAY_STRT:	JSR	START_LVL
-	INC	COUNTER
+	JSR	START_LVL
+DISPLAY_STRT:	INC	COUNTER
 	LDA	COUNTER
-	CMA#	60
+	CMA#	1000
 	JNE	DISPLAY_STRT
 	PSH#	8
 	PSH#	$CD
@@ -92,8 +97,7 @@ SHIP_R1:	.WORD $100 + (11 * CRT_COLS) + (CRT_COLS/2) - 1
 SHIP_R2:	.WORD $100 + (12*CRT_COLS) + (CRT_COLS/2) - 2
 PROJECTILES:	.BLKW	10, 0
 SHIP_HEALTH:	.WORD 5
-CURR_LEVEL1:	.WORD	$31
-CURR_LEVEL2:	.WORD	$30
+CURR_LEVEL:	.WORD	1
 CURR_SCORE:	.WORD	0
 NUM_ENEMIES:	.WORD	0
 ENEMY_SHIPS:	.BLKW	7, 0
@@ -113,10 +117,6 @@ PRINT_SCORE:	LDC	SCORE_STR	; Print "Score:"
 	OUTB+	CRT_VBUF
 	AOC#	6
 	JNE	PRINT_SCORE
-	LDA# '0'
-SCORE_PT2:	OUTB+ CRT_VBUF	; Print numbers for the score
-	AOC# 16
-	JLT SCORE_PT2
 	; Print level
 	LDX#  0
 PRINT_LEVEL:	LDC	LEVEL_STR	; Print "Level:"
@@ -127,10 +127,7 @@ PRINT_LEVEL:	LDC	LEVEL_STR	; Print "Level:"
 	SBX#	30
 	AOC#	6
 	JNE	PRINT_LEVEL	; Print numbers for level
-PRINT_PT2:	LDA# '0'
-	OUTB	LEVEL
-	LDA# '1'
-	OUTB	LEVEL + 1
+	JSR	PUT_LEVEL
 	; Build the Turret
 	JSR 	DISPLAY_SHIP
 	; Print the ground
@@ -157,11 +154,14 @@ PRINT_SLVL:	LDC	LVL_S_STR
 	OUTB&	SL_PORT
 	AOC#	6	
 	JLT	PRINT_SLVL
-	LDA	CURR_LEVEL2
-	OUTB&	SL_PORT
-	ADX#	1
-	LDA	CURR_LEVEL1
-	OUTB&	SL_PORT
+	LDA#	22
+	OUTB	CRT_X
+	LDA#	6
+	OUTB	CRT_Y
+	LDA	CURR_LEVEL
+	JSR	PUT_NUM2
+	LDA#	39
+	OUTB	CRT_X
 	POPX
 	POPA
 	FIN# 	0
@@ -226,6 +226,36 @@ CLR_DISP:	LDA#	' '
 	FIN# 	0
 	RTN
 
+	; Display Score
+PUT_SCORE:	BGN# 	0
+	PSHA
+	PSHX
+	LDA#	7
+	OUTB	CRT_X
+	LDA	CURR_SCORE
+	JSR	PUT_NUM2
+	LDA#	39
+	OUTB	CRT_X
+	POPX
+	POPA
+	FIN# 	0
+	RTN
+
+	; Display Level
+PUT_LEVEL:	BGN# 	0
+	PSHA
+	PSHX
+	LDA#	37
+	OUTB	CRT_X
+	LDA	CURR_LEVEL
+	JSR	PUT_NUM2
+	LDA#	39
+	OUTB	CRT_X
+	POPX
+	POPA
+	FIN# 	0
+	RTN
+		
 	; Add to the Score
 	.EQU	SPEED_ARRAY, 3
 	.EQU	ENEMY_INDEX, 2
@@ -265,7 +295,7 @@ LEVEL_DONE:	BGN#	0
 	LDA	NUM_ENEMIES
 	CMA#	0
 	JNE	EXIT_LVL_DNE
-	INC	CURR_LEVEL1
+	;INC	CURR_LEVEL1
 	; Display beat level
 	JSR	BEAT_LVL
 BEAT_DISPLAY:	INC	COUNTER
@@ -278,22 +308,8 @@ BEAT_DISPLAY:	INC	COUNTER
 	ADS#	2
 	LDA#	0
 	STA	COUNTER
-	LDX#  37	; Check if second digit is less than or equal to 9
-	LDA	CURR_LEVEL1
-	CMA#	$39
-	JGT	DOUBLE_DIGIT	; Must increment first digit if second digit is greater than 9
-	OUTB+	CRT_VBUF	; Print second digit
-	SBX#	1
-	LDA	CURR_LEVEL2	; Print unchanged first digit
-	OUTB+	CRT_VBUF
-	JMP	PRINTED_LVL
-DOUBLE_DIGIT:	LDA#	$30	; Reset second digit to 0 and print
-	STA	CURR_LEVEL1
-	OUTB+	CRT_VBUF
-	SBX#	1
-	INC	CURR_LEVEL2	; Increment first digit and print
-	LDA	CURR_LEVEL2
-	OUTB+	CRT_VBUF
+	INC	CURR_LEVEL
+	JSR	PUT_LEVEL
 	; Display start level
 PRINTED_LVL:	JSR	START_LVL
 STRT_DISPLAY:	INC	COUNTER
@@ -682,6 +698,7 @@ PROJ_ENEMY:	BGN#	0
 	PSH	!PE_INDEX
 	JSR	ADD_SCORE
 	ADS#	2
+	JSR	PUT_SCORE
 	PSH	!PE_ENEMIES
 	PSH	!PE_SPEEDS
 	PSH	!PE_INDEX
