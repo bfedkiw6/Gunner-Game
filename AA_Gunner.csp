@@ -227,11 +227,13 @@ CLR_DISP:	LDA#	' '
 	RTN
 
 	; Add to the Score
-	.EQU    SPEED_ARRAY, 2
+	.EQU	SPEED_ARRAY, 3
+	.EQU	ENEMY_INDEX, 2
 ADD_SCORE:	BGN#	0
 	PSHA
 	PSHX
 	; Use index from enemy to look at corresponding speed
+	LDX#	ENEMY_INDEX
 	LDA&	!SPEED_ARRAY
 	CMA#	3
 	JLT 	ADD_MAG1
@@ -667,26 +669,6 @@ CP_LOOP:	LDA&	!C_PROJ
 	RTN
 C_CURR_PORT:	.WORD	0
 
-	; Clear a value from an array given a value
-	.EQU	ARRAY, 4
-	.EQU	PORT, 3
-	.EQU	SIZE, 2
-CLEAR_ARRAY:	BGN#	0
-	PSHA
-	PSHX
-	LDX#	0
-ARRAY_LOOP:	LDA&	!ARRAY	; Look for where port exists in array
-	CMA	!PORT
-	JNE	ARRAY_CHECK
-	LDA#	0	; Port exists in array, clear it
-	STA&	!ARRAY
-ARRAY_CHECK:	AOC	!SIZE
-	JLT	ARRAY_LOOP
-	POPX
-	POPA
-	FIN# 	0
-	RTN
-
 	; Projectile enemy collision handling
 	.EQU	PE_PORT, 6
 	.EQU	PE_PROJECTILES, 5
@@ -696,6 +678,10 @@ ARRAY_CHECK:	AOC	!SIZE
 PROJ_ENEMY:	BGN#	0
 	PSHA
 	PSHX
+	PSH	!PE_SPEEDS	; Add to the score
+	PSH	!PE_INDEX
+	JSR	ADD_SCORE
+	ADS#	2
 	PSH	!PE_ENEMIES
 	PSH	!PE_SPEEDS
 	PSH	!PE_INDEX
