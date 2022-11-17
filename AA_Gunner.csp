@@ -777,10 +777,6 @@ ME_MOVE:	PSH	!M_ENEMIES
 	PSH	!M_SPEEDS
 	JSR	PROJ_ENEMY
 	ADS#	5
-	;PSH#	!M_MV_SPEEDS	; Add to the score
-	;PSHX
-	;JSR	ADD_SCORE
-	;ADS#	2
 	JMP	M_CONTINUE
 ME_CHK_LEFT:	TXA		; Is right port of enemy past left side of CRT?
 	ADA#	1
@@ -803,10 +799,6 @@ MOVE_RIGHT:	INC&	!M_ENEMIES	; Shift enemy to the right
 	PSH	!M_SPEEDS
 	JSR	PROJ_ENEMY
 	ADS#	5
-	;PSH#	!M_MV_SPEEDS	; Add to the score
-	;PSHX
-	;JSR	ADD_SCORE
-	;ADS#	2
 	JMP	M_CONTINUE
 ME_CHK_RIGHT:	TXA		; Is left port of enemy past right side of CRT?
 	ADA#	1
