@@ -30,7 +30,7 @@
 	.EQU	PUT_NUM2, $E07
 
 	; Game Related .EQUs
-	.EQU	GROUND_CHAR, $2D	; ASCII for "-"
+	.EQU	GROUND_CHAR, $AF	; ASCII for spacing macron overline
 	.EQU	PROJ_CHAR, $A6	; ASCII for double vertical dash
 	.EQU	BOMB_CHAR, $A4	; ASCII for currency sign
 	.EQU	EXPLOSION1, $2A
