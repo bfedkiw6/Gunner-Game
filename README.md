@@ -1,2 +1,2 @@
 # Gunner-Game
-# Created a full working game within CUSP
+Created a full working game within CUSP
